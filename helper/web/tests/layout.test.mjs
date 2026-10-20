@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { row, grid, layered, tree, bounds } from '../engine/layout.js'
+import { row, grid, layered, tree, bounds, safeBounds } from '../engine/layout.js'
 
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2])
 
@@ -83,4 +83,13 @@ test('tree: aceita children, várias raízes e pai inexistente/ciclo', () => {
 test('bounds', () => {
   assert.deepEqual(bounds([[1, 2, 3], [-1, 5, 0]]), { min: [-1, 2, 0], max: [1, 5, 3] })
   assert.deepEqual(bounds([]), { min: [0, 0, 0], max: [0, 0, 0] })
+})
+
+test('safeBounds: vazio ou não finito devolve a caixa padrão', () => {
+  for (const pts of [[], [[Infinity, Infinity, Infinity], [-Infinity, -Infinity, -Infinity]], [[NaN, 0, 0]], undefined]) {
+    const b = safeBounds(pts)
+    assert.ok([...b.min, ...b.max].every(Number.isFinite))
+    assert.ok(b.min[0] < b.max[0])
+  }
+  assert.deepEqual(safeBounds([[1, 2, 3], [-1, 5, 0], [NaN, 0, 0]]), { min: [-1, 2, 0], max: [1, 5, 3] })
 })

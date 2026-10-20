@@ -31,6 +31,14 @@ export function bounds(points) {
   return { min, max }
 }
 
+export const DEFAULT_BOUNDS = { min: [-8, -1.2, -1], max: [8, 1.2, 1] }
+
+// Como bounds, mas ignora pontos não finitos e devolve a caixa padrão quando não sobra nenhum.
+export function safeBounds(points) {
+  const ok = (points || []).filter((p) => Array.isArray(p) && p.length >= 3 && p.every(Number.isFinite))
+  return ok.length ? bounds(ok) : { min: [...DEFAULT_BOUNDS.min], max: [...DEFAULT_BOUNDS.max] }
+}
+
 // Níveis a partir das fontes (busca em profundidade só para achar arestas de retorno, que são ignoradas;
 // depois o caminho mais longo no que sobra, de modo que toda aresta desce); ordem no nível por baricentro.
 export function layered(nodes, edges = []) {

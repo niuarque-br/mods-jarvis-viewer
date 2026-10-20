@@ -1,6 +1,7 @@
 // Palco comum das cenas (three.js): renderer, câmera, rótulos HTML, pacotes, foco e cliques.
 // Regra R6: a conclusão de pacotes é por relógio (setTimeout); a posição visual vem de performance.now() a cada quadro.
 import * as THREE from 'three'
+import { safeBounds } from './layout.js'
 
 const ACCENT = 0xD97757
 const DRAG_PX = 5
@@ -68,12 +69,14 @@ export function createStage(container, { theme } = {}) {
 
   function fit(box, opts = {}) {
     planar = !!opts.planar
-    const b = box && box.min ? box : new THREE.Box3(new THREE.Vector3(-8, -1.2, -1), new THREE.Vector3(8, 1.2, 1))
+    const sb = safeBounds(box && box.min && !box.isEmpty?.() ? [box.min.toArray(), box.max.toArray()] : [])
+    const b = new THREE.Box3(new THREE.Vector3(...sb.min), new THREE.Vector3(...sb.max))
     const size = b.getSize(new THREE.Vector3())
     const c = b.getCenter(new THREE.Vector3())
     Object.assign(fitBox, { cx: c.x, cy: c.y, cz: c.z, hw: Math.max(size.x / 2, 0.5), hh: Math.max(size.y / 2, 0.5), hd: size.z / 2 })
     zoom = 1
-    if (planar) { yaw = 0; pitch = 0 } else pitch = 0.18
+    yaw = 0
+    pitch = planar ? 0 : 0.18
     floor.visible = !planar
     floor.position.y = b.min.y - 1.6
   }
@@ -120,8 +123,25 @@ export function createStage(container, { theme } = {}) {
       if (sub) labelEl.appendChild(document.createTextNode(String(sub)))
       container.appendChild(labelEl)
     }
-    pieces.set(id, { id, object, labelEl, detail: detail ? String(detail) : '', mats, level: 0.35, scale: object.scale.x || 1, off })
+    const piece = { id, object, labelEl, detail: detail ? String(detail) : '', mats, level: 0.35, scale: object.scale.x || 1, off }
+    pieces.set(id, piece)
+    placeLabel(piece) // posiciona já na criação (sem piscar no canto)
     return object
+  }
+
+  const lv = new THREE.Vector3()
+  function placeLabel(p) {
+    if (!p.labelEl) return
+    const w = container.clientWidth || window.innerWidth
+    const h = container.clientHeight || window.innerHeight
+    camera.updateMatrixWorld()
+    p.object.updateWorldMatrix(true, false)
+    p.object.getWorldPosition(lv)
+    lv.y += p.off
+    lv.project(camera)
+    p.labelEl.style.display = lv.z < 1 ? '' : 'none'
+    p.labelEl.style.left = ((lv.x + 1) / 2) * w + 'px'
+    p.labelEl.style.top = ((1 - lv.y) / 2) * h + 'px'
   }
 
   function removePiece(id) {
@@ -140,6 +160,7 @@ export function createStage(container, { theme } = {}) {
 
   // ---- pacotes ----
   const packets = new Set()
+  const trailGeo = Array.from({ length: TRAIL }, (_, k) => new THREE.SphereGeometry(0.16 * (1 - k / 10), 16, 16))
   function packet(from, to, { color = ACCENT, arc = 1, delayMs = 0, ms = 1300 } = {}) {
     const A = new THREE.Vector3().copy(from)
     const B = new THREE.Vector3().copy(to)
@@ -148,7 +169,7 @@ export function createStage(container, { theme } = {}) {
     const parts = []
     for (let k = 0; k < TRAIL; k++) {
       const m = new THREE.Mesh(
-        new THREE.SphereGeometry(0.16 * (1 - k / 10), 16, 16),
+        trailGeo[k],
         new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0 }),
       )
       m.visible = false
@@ -160,7 +181,7 @@ export function createStage(container, { theme } = {}) {
       if (pk.gone) return
       pk.gone = true
       packets.delete(pk)
-      for (const m of parts) { scene.remove(m); m.geometry.dispose(); m.material.dispose() }
+      for (const m of parts) { scene.remove(m); m.material.dispose() }
     }
     packets.add(pk)
     return new Promise((resolve) => {
@@ -251,7 +272,6 @@ export function createStage(container, { theme } = {}) {
   resize()
 
   // ---- laço ----
-  const v = new THREE.Vector3()
   function frame() {
     const nowMs = performance.now()
     const t = nowMs / 1000
@@ -267,8 +287,6 @@ export function createStage(container, { theme } = {}) {
     camera.lookAt(lookAt)
     camera.updateMatrixWorld()
 
-    const w = container.clientWidth || window.innerWidth
-    const h = container.clientHeight || window.innerHeight
     for (const p of pieces.values()) {
       const on = focused ? focused.has(p.id) : false
       const want = focused === null ? 0.35 : on ? 1 : 0.12
@@ -277,12 +295,7 @@ export function createStage(container, { theme } = {}) {
       p.object.scale.setScalar(p.scale * (0.9 + p.level * 0.3) * pulse)
       for (const m of p.mats) m.emissiveIntensity = 0.08 + p.level * 0.9
       if (p.labelEl) {
-        p.object.getWorldPosition(v)
-        v.y += p.off
-        v.project(camera)
-        p.labelEl.style.display = v.z < 1 ? '' : 'none'
-        p.labelEl.style.left = ((v.x + 1) / 2) * w + 'px'
-        p.labelEl.style.top = ((1 - v.y) / 2) * h + 'px'
+        placeLabel(p)
         p.labelEl.classList.toggle('on', on)
         p.labelEl.classList.toggle('dim', focused !== null && !on)
       }
@@ -312,8 +325,12 @@ export function createStage(container, { theme } = {}) {
   // ---- limpeza ----
   function disposeObject(o) {
     o.traverse((c) => {
-      c.geometry?.dispose?.()
-      for (const m of [].concat(c.material || [])) m?.dispose?.()
+      if (!trailGeo.includes(c.geometry)) c.geometry?.dispose?.()
+      for (const m of [].concat(c.material || [])) {
+        if (!m) continue
+        for (const key of Object.keys(m)) if (m[key] && m[key].isTexture) m[key].dispose()
+        m.dispose()
+      }
     })
   }
   function clear() {
@@ -352,12 +369,14 @@ export function createStage(container, { theme } = {}) {
     clear()
     for (const o of base) disposeObject(o)
     tip.remove()
+    for (const g of trailGeo) g.dispose()
     renderer.dispose()
+    renderer.forceContextLoss()
     canvas.remove()
   }
 
   return {
-    THREE, scene, camera, renderer,
+    THREE, scene, camera,
     addPiece, focus, packet, fit,
     onPick(cb) { pickCb = typeof cb === 'function' ? cb : null },
     onFrame(cb) { frameCbs.add(cb); return () => frameCbs.delete(cb) },
