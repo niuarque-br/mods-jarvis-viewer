@@ -5,9 +5,9 @@
 ![Licença MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-blue)
 ![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6)
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-mod-D97757)
-![Status](https://img.shields.io/badge/status-em%20design-orange)
+![Status](https://img.shields.io/badge/status-beta-yellow)
 
-> 🚧 **Em design.** Este README descreve o que o mod vai fazer. O código ainda não foi escrito.
+> 🧪 **Beta.** O mod funciona de ponta a ponta, mas ainda está em teste. Ajustes e arestas são esperados.
 
 ## Por quê
 
@@ -77,7 +77,7 @@ Pelo `/config` de um terminal (opções do plugin `jarvis-viewer`), ou pelo pain
 | Apresentação | `IA escolhe` | `IA escolhe`: o Claude abre quando um desenho ajuda; `Sob demanda`: só quando você pede |
 | Narração | `ligada` | `ligada` narra em voz alta; `desligada` mostra só a legenda. Também muda pela tela do viewer |
 
-Com o Jarvis ligado, a narração sai sempre pelo Jarvis, qualquer que seja essa opção.
+Com o Jarvis ligado, a narração sai sempre pelo Jarvis, qualquer que seja essa opção. Com o Jarvis desligado, a página narra com a voz Microsoft Daniel (pt-BR), ou Microsoft Maria se a Daniel não existir no Windows.
 
 ## Como funciona
 
@@ -94,6 +94,21 @@ Claude Code ── mod (hooks/register.tsx) ──┬── ferramenta "mostrar 
 - O **mod** sobe um servidor local pequeno e dá ao Claude uma ferramenta para mandar cenas: peças, ligações e passos narrados.
 - O **Claude** abre a página ao lado do chat na primeira vez. Depois a página se atualiza a cada cena nova.
 - A **página** desenha a cena em three.js, avança os passos e narra ou mostra a legenda. Com o Jarvis ligado, ela segue a fala dele.
+
+## Desenvolvimento
+
+O `claude` pode não estar no PATH. Nesse caso use o executável do app desktop, em `%APPDATA%\Claude\claude-code\<versão>\<id>\claude.exe`.
+
+```bash
+claude plugin validate .          # manifesto
+claude plugin test .              # testes do mod (hooks/*.test.ts)
+cd helper && python -m pytest -q  # testes do auxiliar
+node --test helper/web/tests/*.test.mjs   # lógica da página
+powershell -ExecutionPolicy Bypass -File scripts/build-helper.ps1   # gera bin/viewer-helper.exe
+python scripts/smoke.py           # ponta a ponta: exe + Edge headless
+```
+
+O mod prefere `bin/viewer-helper.exe`; sem ele, cai para `python -m viewer` em `helper/`. O auxiliar não tem dependências de runtime, e o build só precisa do PyInstaller (venv `.venv-build`, fora do git).
 
 ## Créditos
 

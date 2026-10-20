@@ -1,6 +1,6 @@
 # Jarvis Viewer para o Claude Code — design
 
-Data: 2026-10-20 · Dono: Niuarque Batista · Status: revisado pelo construtor; aguardando aprovação do dono. Decisões marcadas *(minha escolha)* foram tomadas pelo Claude e podem ser revistas; o resto foi decidido pelo dono na conversa.
+Data: 2026-10-20 · Dono: Niuarque Batista · Status: implementado (beta). Decisões marcadas *(minha escolha)* foram tomadas pelo Claude e podem ser revistas; o resto foi decidido pelo dono na conversa.
 
 ## 1. Intenção
 
