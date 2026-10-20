@@ -1,0 +1,18 @@
+{
+  "title": "As camadas de uma requisição web",
+  "type": "camadas",
+  "layers": [
+    { "id": "ui", "label": "Interface", "items": ["Página", "Formulário", "Botões"], "detail": "O que a pessoa vê e toca." },
+    { "id": "api", "label": "API", "items": ["Rotas", "Validação", "Autenticação"], "detail": "Recebe o pedido e decide o que fazer." },
+    { "id": "dominio", "label": "Regras de negócio", "items": ["Pedidos", "Preços", "Estoque"], "detail": "As regras que não dependem de tela nem de banco." },
+    { "id": "dados", "label": "Banco de dados", "items": ["Tabelas", "Índices"], "detail": "Onde tudo fica guardado." }
+  ],
+  "steps": [
+    { "say": "Uma requisição atravessa quatro camadas, cada uma com uma responsabilidade.", "hops": [] },
+    { "focus": ["ui"], "say": "Na interface, a pessoa preenche o formulário e clica no botão." },
+    { "focus": ["ui", "api"], "hops": [["ui", "api"]], "say": "O pedido desce para a API, que confere se o formulário e o login estão corretos." },
+    { "focus": ["dominio"], "hops": [["api", "dominio"]], "say": "As regras de negócio calculam o preço e conferem o estoque." },
+    { "focus": ["dados"], "hops": [["dominio", "dados"]], "say": "O banco grava o pedido." },
+    { "hops": [["dados", "dominio"], ["dominio", "api"], ["api", "ui"]], "say": "A resposta sobe de volta, camada por camada, até a tela." }
+  ]
+}

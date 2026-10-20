@@ -1,0 +1,35 @@
+{
+  "title": "Banco relacional ou documental",
+  "type": "comparacao",
+  "sides": [
+    {
+      "id": "rel",
+      "label": "Relacional",
+      "detail": "Tabelas com esquema fixo e junções.",
+      "items": [
+        { "id": "rel-vel", "label": "Leitura (mil/s)", "value": 40, "detail": "Leituras por segundo em consultas simples." },
+        { "id": "rel-esc", "label": "Escrita (mil/s)", "value": 15, "detail": "Escritas por segundo com garantias completas." },
+        { "id": "rel-esq", "label": "Esquema", "value": "rígido", "detail": "Mudar o esquema pede migração." },
+        { "id": "rel-jun", "label": "Junções", "value": "nativas" }
+      ]
+    },
+    {
+      "id": "doc",
+      "label": "Documental",
+      "detail": "Documentos flexíveis, sem junções nativas.",
+      "items": [
+        { "id": "doc-vel", "label": "Leitura (mil/s)", "value": 55, "detail": "Leituras por segundo em consultas simples." },
+        { "id": "doc-esc", "label": "Escrita (mil/s)", "value": 30, "detail": "Escritas por segundo, com garantias mais leves." },
+        { "id": "doc-esq", "label": "Esquema", "value": "flexível", "detail": "Cada documento pode ter campos diferentes." },
+        { "id": "doc-jun", "label": "Junções", "value": "manuais" }
+      ]
+    }
+  ],
+  "steps": [
+    { "say": "Dois jeitos de guardar dados, lado a lado. As barras usam a mesma escala." },
+    { "highlight": ["rel-vel"], "say": "Na leitura, o documental leva vantagem: 55 mil contra 40 mil por segundo." },
+    { "highlight": ["rel-esc"], "say": "Na escrita a diferença é maior, mas o relacional dá mais garantias." },
+    { "highlight": ["rel-esq"], "say": "O esquema rígido protege os dados; o flexível acelera o começo." },
+    { "highlight": ["rel-jun"], "focus": ["rel", "doc"], "say": "Junções são nativas no relacional e ficam por sua conta no documental." }
+  ]
+}
