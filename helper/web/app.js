@@ -1,6 +1,7 @@
 // Cola da página: SSE, controles, legenda e fala. A lógica de reprodução está em core.js (puro).
 // Conclusão de passo é por relógio (setTimeout/Promise), nunca por contagem de quadros (rAF para em aba de fundo).
 import { History, nextAction, stepMs, pickVoice } from './core.js'
+import { createStage, systemTheme } from './engine/stage.js'
 
 // O token vai no caminho (/TOKEN/): todas as URLs são relativas, sem token no código.
 const LOST_MS = 5000
@@ -30,19 +31,20 @@ function post(event) {
   fetch('event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }).catch(() => {})
 }
 
-// ---------- palco mínimo (a Tarefa 10 troca por engine/stage.js) ----------
-let pickHandler = null
-const stage = {
-  el: el.stage,
-  wait,
-  now: () => performance.now(),
-  onPick(fn) { pickHandler = fn },
-  pick(node) { pick(node) },
+// ---------- palco (engine/stage.js) ----------
+let stage = null
+try {
+  stage = createStage(el.stage, { theme: systemTheme() })
+  stage.onPick((id) => pick(id))
+  try {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => stage.setTheme(systemTheme()))
+  } catch { /* sem matchMedia */ }
+} catch (e) {
+  console.error('palco:', e)
 }
-// Tarefa 10 liga os cliques do renderer a isto: manda pick{scene,node}.
+// Clique numa peça: manda pick{scene,node} ao auxiliar.
 export function pick(node) {
   if (current && typeof node === 'string') post({ type: 'pick', scene: current.id, node })
-  if (pickHandler) pickHandler(node)
 }
 window.jarvisViewer = { pick }
 
@@ -123,6 +125,7 @@ async function load(item, event) {
   el.caption.classList.remove('error')
   if (current?.built) { try { current.built.dispose() } catch (e) { console.error(e) } }
   current = null
+  stage?.clear()
   const scene = item.scene || {}
   el.title.firstChild.textContent = scene.title || 'Jarvis Viewer'
   el.title.querySelector('span').textContent = ''
@@ -138,6 +141,7 @@ async function load(item, event) {
   if (seq !== loadSeq) return
   let built
   try {
+    if (!stage) throw new Error('sem 3D')
     built = mod.build(scene, stage)
   } catch (e) {
     console.error(e)

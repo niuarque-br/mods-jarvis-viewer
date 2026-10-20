@@ -38,3 +38,12 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 #lost { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); z-index: 3; background: var(--panel);
         border: 1px solid var(--error); color: var(--error); border-radius: 8px; padding: 8px 14px; font-size: 13px; }
 #lost[hidden], #narr-hint[hidden] { display: none; }
+.jv-label { position: absolute; transform: translate(-50%, 0); pointer-events: none; text-align: center; white-space: nowrap;
+            font-size: 13px; color: var(--dim); transition: color .4s, opacity .4s; z-index: 1; }
+.jv-label b { display: block; font-size: 15px; color: var(--fg); font-weight: 600; }
+.jv-label b i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+.jv-label.on b { text-shadow: 0 0 12px var(--accent); }
+.jv-label.dim { opacity: .45; }
+.jv-tip { position: absolute; z-index: 3; pointer-events: none; max-width: 280px; background: var(--panel); color: var(--fg);
+          border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+.jv-tip[hidden] { display: none; }
