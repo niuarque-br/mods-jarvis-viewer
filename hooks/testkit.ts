@@ -29,6 +29,8 @@ export type WorldOptions = {
   store?: Record<string, unknown>
   storeFails?: ('get' | 'set')[]
   surfaces?: ('desktop' | 'terminal')[]
+  /** Runs after each command reaches the fake helper: how a test plays the page. */
+  onCmd?: (cmd: Record<string, unknown>, calls: World) => void
 }
 
 export function world(on: On, opts: WorldOptions = {}): World {
@@ -79,6 +81,7 @@ export function world(on: On, opts: WorldOptions = {}): World {
     calls.cmds.push(cmd)
     calls.headers.push(e.init?.headers as Record<string, string> | undefined)
     if (cmd.type === 'quit') calls.release()
+    opts.onCmd?.(cmd, calls)
     return { value: { status: 204, ok: true, headers: {}, text: '' } }
   })
   on('process.spawn', async function* ($, e) {

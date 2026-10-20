@@ -3,6 +3,9 @@ import type { PluginOptions, Register } from 'claude-code'
 import { guidance, viewerPrompt } from './guidance'
 import { startHelper } from './helper'
 import type { HelperHandle } from './helper'
+import { Cancel, jarvisLink, narrateWithJarvis } from './jarvis'
+import type { JarvisLink } from './jarvis'
+import type { Narrator } from './narration'
 import { NARRATION_KEY, chooseNarrator, narrationOn } from './narration'
 import { PickQueue } from './picks'
 import { LIMITS, SCENE_TYPES, pieceLabel, validateScene } from './scene'
@@ -56,12 +59,24 @@ let starting: Promise<HelperHandle> | undefined
 let lastHandle: HelperHandle | undefined
 let mainTurn: string | undefined
 let picks = new PickQueue()
+// Jarvis narration: one loop at a time, for the live scene only.
+let link: JarvisLink | undefined
+let sceneNarrator: Narrator | undefined
+let pendingStart: { id: string; from: number } | null = null
+let loop: { cancel: Cancel } | null = null
+let loopDone: Promise<unknown> = Promise.resolve()
+let loopTicket = 0
+let waiting: { scene: string; step: number; resolve: () => void } | null = null
 
 export const register: Register = (on, options: PluginOptions) => {
   on('session.start', async ($, e, next) => {
+    await stopLoop()
     await shutdown()
     lastScene = null
     counter = 0
+    link = undefined
+    sceneNarrator = undefined
+    pendingStart = null
     lastHandle = undefined
     mainTurn = undefined
     picks = new PickQueue()
@@ -101,8 +116,17 @@ export const register: Register = (on, options: PluginOptions) => {
   })
 
   on('session.end', async ($, e, next) => {
+    pendingStart = null
+    await stopLoop()
     await shutdown()
     return next(e)
+  })
+
+  // The Jarvis answers each `say` by writing its own `said`.
+  on('state.set', { plugin: 'modo-conversa', key: 'said' }, async ($, e, next) => {
+    const result = await next(e)
+    link?.heard(e.value)
+    return result
   })
 
   on('tool.call', { tool: TOOL }, async ($, e) => {
@@ -137,27 +161,104 @@ export const register: Register = (on, options: PluginOptions) => {
       return { deny: (err as Error).message }
     }
 
+    const jarvis = linkOf($)
+    // Whatever the Jarvis was narrating is over: a scene (or a replay) takes the page.
+    pendingStart = null
+    void stopLoop()
+    let narrator: Narrator
     // A replay on a helper that never saw the scene (it was respawned) sends the scene again.
-    if (input.replay && lastHandle === helper) await helper.send({ type: 'play', id: sent.id, from })
-    else {
-      let saved: unknown
-      try {
-        saved = await $.store.get(NARRATION_KEY)
-      } catch {
-        saved = undefined
-      }
-      const narrator = chooseNarrator(false, narrationOn(optionOf(options), saved))
+    if (input.replay && lastHandle === helper) {
+      narrator = sceneNarrator ?? 'page'
+      await helper.send({ type: 'play', id: sent.id, from })
+    } else {
+      narrator = chooseNarrator(await jarvis.isOn(), await localNarration($, options))
       await helper.send({ type: 'scene', id: sent.id, scene: sent.scene, narrator, from })
     }
     lastScene = sent
     lastHandle = helper
+    sceneNarrator = narrator
+    // With the Jarvis narrating, the loop starts once a page is there (now, or at page-open).
+    if (narrator === 'jarvis') pendingStart = { id: sent.id, from }
 
     const n = sent.scene.steps.length
-    if ((await helper.pages()) > 0) return { result: `Cena exibida: ${n} passos.` }
+    const pages = await helper.pages()
+    if (pages > 0) startPending($, options, helper)
+    if (pages > 0) return { result: `Cena exibida: ${n} passos.` }
     return {
       result: `Abra ${helper.url} no navegador embutido com preview_start (parâmetro url). Em seguida a cena aparece sozinha.`,
     }
   })
+}
+
+async function localNarration($: EngineOf, options: PluginOptions | undefined): Promise<boolean> {
+  let saved: unknown
+  try {
+    saved = await $.store.get(NARRATION_KEY)
+  } catch {
+    saved = undefined
+  }
+  return narrationOn(optionOf(options), saved)
+}
+
+/** Ends the running narration loop, if any (and a start still on its way), and waits until it let go (playing false). */
+async function stopLoop(): Promise<void> {
+  loopTicket++
+  await haltLoop()
+}
+
+async function haltLoop(): Promise<void> {
+  loop?.cancel.cancel()
+  loop = null
+  waiting = null
+  await loopDone
+}
+
+/** Starts the loop asked for by the last scene, once. */
+function startPending($: EngineOf, options: PluginOptions | undefined, helper: HelperHandle): void {
+  const start = pendingStart
+  pendingStart = null
+  if (start) void startLoop($, options, helper, start.id, start.from)
+}
+
+/** Narrates the live scene with the Jarvis from `from`; replaces any loop still running. */
+async function startLoop($: EngineOf, options: PluginOptions | undefined, helper: HelperHandle, id: string, from: number): Promise<void> {
+  const ticket = ++loopTicket
+  await haltLoop()
+  if (ticket !== loopTicket) return
+  const scene = lastScene
+  if (!scene || scene.id !== id || from < 0 || from >= scene.scene.steps.length) return
+  const cancel = new Cancel()
+  loop = { cancel }
+  const jarvis = linkOf($)
+  const run = narrateWithJarvis(
+    jarvis,
+    cmd => helper.send(cmd),
+    scene.scene,
+    from,
+    step =>
+      new Promise<void>(resolve => {
+        waiting = { scene: id, step, resolve }
+      }),
+    {
+      cancel,
+      localNarration: () => localNarration($, options),
+      onFallback: narrator => {
+        if (lastScene?.id === id) sceneNarrator = narrator
+      },
+    },
+  ).catch(() => 'error' as const)
+  loopDone = run
+  void run.then(() => {
+    if (loopTicket === ticket) loop = null
+  })
+}
+
+type EngineOf = Parameters<typeof startHelper>[0]
+
+/** The session's channel with the Jarvis, made on first use. */
+function linkOf($: EngineOf): JarvisLink {
+  if (!link) link = jarvisLink($)
+  return link
 }
 
 /** Stops the running helper (also one still starting) and forgets it. */
@@ -192,11 +293,40 @@ function launch($: Parameters<typeof startHelper>[0], options: PluginOptions | u
               // saving is best-effort; the page still gets the mode
             }
             try {
-              await mine?.send({ type: 'mode', narrator: chooseNarrator(false, flag), narration: flag })
+              const narrator = chooseNarrator(await linkOf($).isOn(), flag)
+              if (lastScene) sceneNarrator = narrator
+              await mine?.send({ type: 'mode', narrator, narration: flag })
             } catch {
               // helper gone; nothing to tell
             }
           })()
+          return
+        }
+        if (event.type === 'page-open') {
+          // A page that (re)opens shows the scene from step 1, waiting for ▶ when the Jarvis narrates.
+          if (mine && pendingStart) startPending($, options, mine)
+          else if (loop) void stopLoop()
+          return
+        }
+        if (event.type === 'step-done') {
+          const w = waiting
+          if (w && event.scene === w.scene && event.step === w.step) {
+            waiting = null
+            w.resolve()
+          }
+          return
+        }
+        if (event.type === 'paused') {
+          // also stops a loop still starting (a resume a moment before)
+          if (lastScene && event.scene === lastScene.id) void stopLoop()
+          return
+        }
+        if (event.type === 'resume') {
+          const sceneId = event.scene as unknown
+          const step = event.step as unknown
+          if (!mine || !lastScene || sceneId !== lastScene.id || typeof step !== 'number' || !Number.isInteger(step)) return
+          pendingStart = null
+          void startLoop($, options, mine, lastScene.id, step)
           return
         }
         if (event.type === 'pick') {
