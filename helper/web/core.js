@@ -35,6 +35,11 @@ export function stepMs(animMs, say, narrator) {
   return animMs
 }
 
+// Peças internas (ids com «__», como a legenda da rosca) nunca viram nó do usuário.
+export function isUserPiece(id) {
+  return typeof id === 'string' && id !== '' && !id.startsWith('__')
+}
+
 export function pickVoice(voices) {
   const pt = (voices || []).filter((v) => v && String(v.lang || '').toLowerCase().replace('_', '-') === 'pt-br')
   const named = (n) => pt.find((v) => String(v.name).startsWith(n))

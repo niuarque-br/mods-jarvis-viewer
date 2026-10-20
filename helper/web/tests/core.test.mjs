@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { stepMs, pickVoice, History, nextAction } from '../core.js'
+import { stepMs, pickVoice, isUserPiece, History, nextAction } from '../core.js'
 
 const kinds = (r) => r.actions.map((a) => a.type)
 const run = (r) => r.actions.filter((a) => a.type === 'run-step').map((a) => a.step)
@@ -194,4 +194,11 @@ test('cena aberta do histórico: local, pausada no passo 1', () => {
   assert.deepEqual(run(r), [])
   const p = nextAction(r.state, { type: 'ui-play' })
   assert.deepEqual(run(p), [0])
+})
+test('isUserPiece recusa ids internos (__) e não-strings', () => {
+  assert.equal(isUserPiece('api'), true)
+  assert.equal(isUserPiece('link:a>b'), true)
+  assert.equal(isUserPiece('__cat:2'), false)
+  assert.equal(isUserPiece(''), false)
+  assert.equal(isUserPiece(undefined), false)
 })
