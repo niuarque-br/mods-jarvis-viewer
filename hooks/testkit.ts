@@ -3,11 +3,6 @@ import type { Engine, On } from 'claude-code'
 export const READY = '{"type":"ready","port":47821}\n'
 export const ready = (port: number): string => `{"type":"ready","port":${port}}\n`
 
-/** Aciona o comando interno `viewer-ponte` (register.tsx), que roda a ponte com o `$` do plugin. */
-export function bridge($: Engine, args: string): Promise<unknown> {
-  return $.command.run({ command: 'viewer-ponte', args, origin: { kind: 'user' } as never, presentation: 'inline' as never })
-}
-
 export type World = {
   spawned: { argv: readonly string[]; cwd?: string; env?: Record<string, string> }[]
   toasts: string[]
@@ -16,6 +11,7 @@ export type World = {
   urls: string[]
   submitted: string[]
   origins: unknown[]
+  registered: { name: string; description: string; inputSchema?: Record<string, unknown> }[]
   store: Map<string, unknown>
   pages: number
   order: string[]
@@ -30,6 +26,7 @@ export type WorldOptions = {
   port?: number
   pages?: number
   store?: Record<string, unknown>
+  surfaces?: ('desktop' | 'terminal')[]
 }
 
 export function world(on: On, opts: WorldOptions = {}): World {
@@ -47,6 +44,7 @@ export function world(on: On, opts: WorldOptions = {}): World {
     urls: [],
     submitted: [],
     origins: [],
+    registered: [],
     store: new Map(Object.entries(opts.store ?? {})),
     pages: opts.pages ?? 0,
     order: [],
@@ -59,6 +57,11 @@ export function world(on: On, opts: WorldOptions = {}): World {
       wake()
     },
   }
+  on('session.surfaces', async () => ({ value: opts.surfaces ?? ['desktop'] }))
+  on('tool.register', async ($, e) => {
+    calls.registered.push(e)
+    return { value: { tool: `mcp__${$.plugin.name}__${e.name}` } }
+  })
   on('fs.exists', async () => ({ value: !!opts.exe }))
   on('http.fetch', async ($, e) => {
     calls.urls.push(e.url)
@@ -110,4 +113,22 @@ export function world(on: On, opts: WorldOptions = {}): World {
   })
   on('store.keys', async () => ({ value: [...calls.store.keys()] }))
   return calls
+}
+
+export const TOOL = 'mcp__jarvis-viewer__mostrar_cena'
+
+export const SCENE = {
+  title: 'Pedido',
+  type: 'arquitetura',
+  nodes: [
+    { id: 'web', label: 'Site' },
+    { id: 'api', label: 'API' },
+  ],
+  links: [{ from: 'web', to: 'api' }],
+  steps: [{ say: 'Um.', focus: ['web'] }, { say: 'Dois.', hops: [['web', 'api']] }, { say: 'Três.' }],
+}
+
+/** Raises the tool the way the model does, through the plugin's tool.call hook. */
+export function show($: Engine, input: Record<string, unknown> = { scene: SCENE }) {
+  return $.tool.call({ tool: TOOL, ...input } as never) as Promise<{ deny?: string; result?: unknown }>
 }
