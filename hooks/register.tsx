@@ -54,12 +54,16 @@ let lastHandle: HelperHandle | undefined
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
+    await shutdown()
     lastScene = null
     counter = 0
-    handle = undefined
-    starting = undefined
     lastHandle = undefined
     await $.tool.register({ name: 'mostrar_cena', description: TOOL_DESCRIPTION, inputSchema: TOOL_SCHEMA, isDeferred: false })
+    return next(e)
+  })
+
+  on('session.end', async ($, e, next) => {
+    await shutdown()
     return next(e)
   })
 
@@ -69,7 +73,8 @@ export const register: Register = on => {
       return { deny: 'O viewer só funciona no app desktop; siga só com texto.' }
     }
 
-    const input = e as unknown as { scene?: unknown; replay?: boolean; from?: number }
+    // The engine puts the tool's arguments beside `tool` on the event (ToolCallEnvelope).
+    const input = { scene: e.scene, replay: e.replay === true, from: typeof e.from === 'number' ? e.from : undefined }
     let sent: { id: string; scene: Scene }
     let from = 0
     if (input.replay) {
@@ -106,6 +111,16 @@ export const register: Register = on => {
       result: `Abra ${helper.url} no navegador embutido com preview_start (parâmetro url). Em seguida a cena aparece sozinha.`,
     }
   })
+}
+
+/** Stops the running helper (also one still starting) and forgets it. */
+async function shutdown(): Promise<void> {
+  const pending = starting
+  const running = handle
+  handle = undefined
+  starting = undefined
+  const h = running ?? (pending ? await pending.catch(() => undefined) : undefined)
+  await h?.stop()
 }
 
 function launch($: Parameters<typeof startHelper>[0]): Promise<HelperHandle> {

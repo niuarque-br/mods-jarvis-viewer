@@ -2,6 +2,7 @@ import { expect, mock, test } from 'claude-code/testing'
 
 import { SCENE, TOOL, ready, show, world } from './testkit'
 import { TOOL_DESCRIPTION } from './register'
+import { validateScene } from './scene'
 
 const text = (r: { result?: unknown }): string => String((r.result as { text?: string } | string | undefined) && ((r.result as { text?: string }).text ?? r.result))
 
@@ -140,4 +141,36 @@ test('a ferramenta é registrada no session.start', async ($, on) => {
   await clock.settle()
   expect(calls.registered.map(t => t.name)).toEqual(['mostrar_cena'])
   expect(calls.registered[0]!.inputSchema).toMatchObject({ type: 'object', properties: { scene: {}, replay: {}, from: {} } })
+})
+
+test('fim da sessão manda quit ao auxiliar', async ($, on) => {
+  const clock = mock.clock(on)
+  const calls = world(on)
+  on('session.end', () => ({ sessionId: 'test' }))
+  await show($)
+  await clock.settle()
+  await $.session.end({ reason: 'other' })
+  await clock.settle()
+  expect(calls.cmds.at(-1)).toEqual({ type: 'quit' })
+})
+
+test('session.start repetido para o auxiliar antigo', async ($, on) => {
+  const clock = mock.clock(on)
+  const calls = world(on)
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  await show($)
+  await clock.settle()
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await clock.settle()
+  expect(calls.cmds.at(-1)).toEqual({ type: 'quit' })
+  await show($)
+  await clock.settle()
+  expect(calls.spawned).toHaveLength(2)
+  expect(calls.cmds.at(-1)).toMatchObject({ type: 'scene', id: 's1' })
+})
+
+test('os exemplos da descrição passam no validateScene', async () => {
+  const examples = [...TOOL_DESCRIPTION.matchAll(/^\{"scene":.*\}$/gm)].map(m => JSON.parse(m[0]).scene)
+  expect(examples).toHaveLength(2)
+  for (const scene of examples) expect(validateScene(scene)).toMatchObject({ ok: true })
 })

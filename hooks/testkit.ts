@@ -129,6 +129,6 @@ export const SCENE = {
 }
 
 /** Raises the tool the way the model does, through the plugin's tool.call hook. */
-export function show($: Engine, input: Record<string, unknown> = { scene: SCENE }) {
-  return $.tool.call({ tool: TOOL, ...input } as never) as Promise<{ deny?: string; result?: unknown }>
+export function show($: Engine, input: { scene?: unknown; replay?: boolean; from?: number } = { scene: SCENE }) {
+  return $.tool.call({ tool: TOOL, ...input })
 }

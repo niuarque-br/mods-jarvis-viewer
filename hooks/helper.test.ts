@@ -18,7 +18,7 @@ test('prefere o exe empacotado', async ($, on) => {
   const calls = world(on, { exe: true })
   await show($)
   await clock.settle()
-  expect(calls.spawned[0]!.argv[0]).toMatch(/bin[\/]viewer-helper\.exe$/)
+  expect(calls.spawned[0]!.argv[0]).toMatch(/bin[\\/]viewer-helper\.exe$/)
   expect(calls.spawned[0]!.argv.slice(1)).toEqual(['--port-from', '47821', '--port-to', '47830'])
 })
 
