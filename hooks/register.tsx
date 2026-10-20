@@ -130,9 +130,11 @@ export const register: Register = (on, options: PluginOptions) => {
   })
 
   // The Jarvis went off: a sentence it was asked for will never be said, so fall back now, not in 30 s.
+  // The Jarvis came on: it takes the live scene over (the page stops its voice and waits for ▶).
   on('state.set', { plugin: 'modo-conversa', key: 'mode' }, async ($, e, next) => {
     const result = await next(e)
     link?.modeChanged(e.value)
+    if (e.value === 'on') $.clock.after(0, () => void jarvisTookOver($, options))
     return result
   })
 
@@ -175,7 +177,10 @@ export const register: Register = (on, options: PluginOptions) => {
     let narrator: Narrator
     // A replay on a helper that never saw the scene (it was respawned) sends the scene again.
     if (input.replay && lastHandle === helper) {
-      narrator = sceneNarrator ?? 'page'
+      // The Jarvis may have gone on or off since the scene was shown: the page learns the narrator first.
+      const narration = await localNarration($, options)
+      narrator = chooseNarrator(await jarvis.isOn(), narration)
+      if (narrator !== sceneNarrator) await helper.send({ type: 'mode', narrator, narration })
       await helper.send({ type: 'play', id: sent.id, from })
     } else {
       narrator = chooseNarrator(await jarvis.isOn(), await localNarration($, options))
@@ -205,6 +210,19 @@ async function localNarration($: EngineOf, options: PluginOptions | undefined): 
     saved = undefined
   }
   return narrationOn(optionOf(options), saved)
+}
+
+/** The Jarvis came on while the page narrates the live scene: the page hands it over and waits for ▶ (resume). */
+async function jarvisTookOver($: EngineOf, options: PluginOptions | undefined): Promise<void> {
+  const helper = handle
+  if (!helper || !lastScene || lastHandle !== helper || sceneNarrator === 'jarvis') return
+  sceneNarrator = 'jarvis'
+  const narration = await localNarration($, options)
+  try {
+    await helper.send({ type: 'mode', narrator: 'jarvis', narration })
+  } catch {
+    // helper gone; nothing to tell
+  }
 }
 
 /** Ends the running narration loop, if any (and a start still on its way), and waits until it let go (playing false). */

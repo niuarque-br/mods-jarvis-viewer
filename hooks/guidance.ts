@@ -1,15 +1,17 @@
-const BASE = `Viewer: a ferramenta mostrar_cena (mcp__jarvis-viewer__mostrar_cena) mostra uma explicação como cena animada no navegador embutido do app desktop.
-Use para: conceito com partes, arquitetura, fluxo, sequência de passos, evolução no tempo, resultado numérico.
-Não use para: resposta curta, ajuste pontual, pergunta de sim ou não.
-No chat: uma frase curta antes, a cena, um resumo curto depois, sem repetir os passos.
+const INTRO = `Viewer: a ferramenta mostrar_cena (mcp__jarvis-viewer__mostrar_cena) mostra uma explicação como cena animada no navegador embutido do app desktop.`
+const CHAT = `No chat: uma frase curta antes, a cena, um resumo curto depois, sem repetir os passos.
 Se o resultado pedir para abrir o endereço, chame preview_start com esse url.`
 
-const AUTO = `Decida sozinho quando uma cena ajuda mais do que texto.`
-const ON_DEMAND = `Use o viewer só quando o usuário pedir (por exemplo com /viewer ou "mostre no viewer"); sem pedido, responda só com texto.`
+const AUTO = `Use para: conceito com partes, arquitetura, fluxo, sequência de passos, evolução no tempo, resultado numérico.
+Não use para: resposta curta, ajuste pontual, pergunta de sim ou não.
+Decida sozinho quando uma cena ajuda mais do que texto.`
+// The criteria only shape a scene the user asked for; they never invite one.
+const ON_DEMAND = `Use o viewer só quando o usuário pedir (por exemplo com /viewer ou "mostre no viewer"); sem pedido, responda só com texto.
+Quando ele pedir, monte a cena do que foi pedido: conceito com partes, arquitetura, fluxo, sequência de passos, evolução no tempo ou resultado numérico.`
 
 /** Text added to every prompt.compose; an unknown value counts as "IA escolhe". */
 export function guidance(presentation: string): string {
-  return `${BASE}\n${presentation === 'Sob demanda' ? ON_DEMAND : AUTO}`
+  return `${INTRO}\n${presentation === 'Sob demanda' ? ON_DEMAND : AUTO}\n${CHAT}`
 }
 
 /** What /viewer submits as the user's message. */

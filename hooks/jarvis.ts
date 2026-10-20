@@ -8,7 +8,8 @@ export const SAY_TIMEOUT_MS = 30000
 export const STEP_DONE_TIMEOUT_MS = 30000
 export const FALLBACK_CAPTION = 'narrando pela página'
 
-export type SayOutcome = 'done' | 'stopped' | 'timeout'
+/** failed: the Jarvis is on but could not speak (its voice page inactive, mic denied) — handled like timeout. */
+export type SayOutcome = 'done' | 'stopped' | 'failed' | 'timeout'
 export type NarrateOutcome = 'ended' | 'stopped' | 'fallback' | 'cancelled' | 'lost'
 
 /** The part of JarvisLink the narration loop uses (a fake in tests). */
@@ -87,7 +88,7 @@ export function jarvisLink($: EngineInterface): JarvisLink {
     heard(value) {
       const said = value as { id?: unknown; outcome?: unknown } | null | undefined
       if (!said || typeof said !== 'object' || typeof said.id !== 'string') return
-      if (said.outcome !== 'done' && said.outcome !== 'stopped') return
+      if (said.outcome !== 'done' && said.outcome !== 'stopped' && said.outcome !== 'failed') return
       pending.get(said.id)?.(said.outcome)
     },
     modeChanged(value) {
@@ -151,7 +152,14 @@ export async function narrateWithJarvis(
     } catch {
       narration = true
     }
-    const narrator = chooseNarrator(false, narration) as 'page' | 'caption'
+    // R22: while the Jarvis is still on, the page only shows the caption (never two voices).
+    let stillOn = false
+    try {
+      stillOn = await link.isOn()
+    } catch {
+      stillOn = false
+    }
+    const narrator = stillOn ? 'caption' : (chooseNarrator(false, narration) as 'page' | 'caption')
     options.onFallback?.(narrator)
     await send({ type: 'mode', narrator, narration, from: step })
     await send({ type: 'caption', text: FALLBACK_CAPTION })
@@ -175,8 +183,8 @@ export async function narrateWithJarvis(
         await send({ type: 'pause' })
         return 'stopped'
       }
-      // Step i was animated but not heard: the page narrates from it (Review Focus #3).
-      if (said === 'timeout') return await fallback(i)
+      // Step i was animated but not heard: the page narrates from it (Review Focus #3, R19, R23).
+      if (said === 'timeout' || said === 'failed') return await fallback(i)
       const timer = options.stepDoneTimer?.()
       const waits: Promise<'shown' | 'cancelled' | 'lost'>[] = [shown.then(() => 'shown' as const), cancel.done]
       if (timer) waits.push(timer.done.then(() => 'lost' as const))

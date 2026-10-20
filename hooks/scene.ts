@@ -352,8 +352,27 @@ export function validateScene(input: unknown): Validation {
   return c.errors.length ? { ok: false, errors: c.errors } : { ok: true, scene: input as Scene }
 }
 
+// Label of a chart point `série#i`: "<série> · <categoria>" (dispersao: the point's own label).
+function pointLabel(scene: Scene, id: string): string | undefined {
+  const m = /^(.*)#(\d+)$/.exec(id)
+  if (!m || scene.type !== 'grafico' || !Array.isArray(scene.series)) return undefined
+  const s = scene.series.find(it => isObj(it) && it.id === m[1])
+  if (!isObj(s)) return undefined
+  const i = Number(m[2])
+  const name = isStr(s.label) ? s.label : m[1]
+  if (scene.chart === 'dispersao') {
+    const pt = Array.isArray(s.points) ? s.points[i] : undefined
+    if (!isObj(pt)) return undefined
+    return isStr(pt.label) && pt.label !== '' ? pt.label : `${name} · ${i + 1}`
+  }
+  const cats = Array.isArray(scene.categories) ? scene.categories : []
+  return i < cats.length && isStr(cats[i]) ? `${name} · ${cats[i]}` : undefined
+}
+
 // Label of the piece (or sub-item) with this id, for click messages and captions.
 export function pieceLabel(scene: Scene, id: string): string | undefined {
+  const point = pointLabel(scene, id)
+  if (point !== undefined) return point
   const find = (arr: unknown): string | undefined => {
     if (!Array.isArray(arr)) return undefined
     for (const it of arr) {

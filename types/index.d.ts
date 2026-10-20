@@ -1,6 +1,7 @@
 export type SayRequest = { id: string; text: string }
 export type JarvisMode = 'off' | 'starting' | 'on'
-export type JarvisSaid = { id: string; outcome: 'done' | 'stopped' } | null
+// failed (R23): the Jarvis is on but could not speak; the viewer falls back like a timeout.
+export type JarvisSaid = { id: string; outcome: 'done' | 'stopped' | 'failed' } | null
 
 declare module 'claude-code' {
   interface PluginState {

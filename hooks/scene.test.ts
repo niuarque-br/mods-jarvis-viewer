@@ -145,3 +145,20 @@ test('metafora: cor no formato #rrggbb', () => {
 })
 test('metafora: ação com alvo inexistente é recusada', () =>
   expect(errs(META({}, { target: 'zz' }))).toContain('steps[0].actions[0].target: id "zz" não existe'))
+
+test('pieceLabel de ponto de gráfico: série · categoria (M2)', () => {
+  const bar = {
+    title: 'Vendas', type: 'grafico', chart: 'barras', categories: ['Jan', 'Fev'],
+    series: [{ id: 'v', label: 'Vendas', values: [10, 14] }], steps: [{ say: 'x' }],
+  } as unknown as Scene
+  expect(pieceLabel(bar, 'v#1')).toBe('Vendas · Fev')
+  expect(pieceLabel(bar, 'v')).toBe('Vendas')
+  expect(pieceLabel(bar, 'v#9')).toBeUndefined()
+  expect(pieceLabel(bar, 'x#0')).toBeUndefined()
+  const scatter = {
+    title: 'P', type: 'grafico', chart: 'dispersao',
+    series: [{ id: 'p', label: 'Pontos', points: [{ x: 1, y: 2, label: 'Alfa' }, { x: 3, y: 4 }] }], steps: [{ say: 'x' }],
+  } as unknown as Scene
+  expect(pieceLabel(scatter, 'p#0')).toBe('Alfa')
+  expect(pieceLabel(scatter, 'p#1')).toBe('Pontos · 2')
+})
