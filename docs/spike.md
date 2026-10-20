@@ -18,8 +18,13 @@ Build: Claude Code 2.1.304. Mods descartáveis `spike-a` e `spike-b` ficaram no 
 
 ## Como foi provado (e o limite da prova)
 
-Uma sessão real com dois `--plugin-dir` não rodou (autenticação expirada no `claude -p`). A prova foi um `claude plugin test` sobre `spike-ab`: um único plugin chamado `spike-a` cujo módulo registra o comando `/spike-say` (faz `$.state.set` em `spike-a.say`) e também os hooks do `spike-b` (`on('state.set', { plugin:'spike-a', key:'say' })` com `$.ui.toast` e `$.fs.write`, e o comando `/spike-read` com `$.state.get`). Isso prova o roteamento do evento `state.set` pelo motor e a leitura de `state.get`. Não prova a regra "só o dono escreve" entre dois plugins distintos nem a visibilidade entre dois `--plugin-dir`; isso fica para a Tarefa 20 (sessão real no app).
+Uma sessão real com dois `--plugin-dir` não rodou (autenticação expirada no `claude -p`). Duas provas com `claude plugin test`, ambas com asserções (`expect`):
+
+1. Dois plugins distintos: o teste fica na pasta de `spike-a` (plugin sob teste, dono de `spike-a.say`, comando `/spike-say`) e carrega `spike-b` como plugin inline (`test(nome, { plugins: [spikeB] }, ...)`, nome `spike-b`, com `on('state.set', { plugin:'spike-a', key:'say' })` que grava o valor e o comando `/spike-read` com `$.state.get`). Asserções: o valor que o observador viu é `{"id":"1","text":"oi"}` e `$.state.get` devolve `{ value: {id:'1',text:'oi'}, version: 1 }`. Saída: `(pass) dois plugins distintos: b observa e le o state de a`, `1 pass, 0 fail`.
+2. Um plugin só (`spike-ab`, writer e observador no mesmo módulo), mesmas asserções: `(pass) spike-b observa state.set de spike-a e le o valor`.
+
+O que não foi provado: dois `--plugin-dir` independentes numa sessão real (cada um com seu manifesto e `types`); isso fica para a Tarefa 20.
 
 ## Decisão
 
-O canal por `state.set` funciona: é o canal das Tarefas 16 a 18. O Jarvis (dono de `modo-conversa`) e o viewer (dono de `jarvis-viewer`) cada um escreve só nas próprias chaves. O outro lado observa com `on('state.set', { plugin, key }, ...)` e lê com `$.state.get`, citando a chave por literal; declarar a chave do outro no próprio `types/index.d.ts` é opcional para a validação. A alternativa (a) (rota HTTP do auxiliar do Jarvis, porta 47811, `viewer-link.json`) não será construída. Se a Tarefa 20 mostrar que dois plugins reais não se enxergam, volta-se à alternativa (a).
+O canal por `state.set` funciona, inclusive entre dois plugins distintos no kit de testes: é o canal das Tarefas 16 a 18. O Jarvis (dono de `modo-conversa`) e o viewer (dono de `jarvis-viewer`) escrevem só nas próprias chaves; o outro lado observa com `on('state.set', { plugin, key }, ...)` e lê com `$.state.get`, citando a chave por literal (declarar a chave do outro no próprio `types/index.d.ts` é opcional para a validação). A Tarefa 20 confirma numa sessão real com os dois plugins instalados. Se não se enxergarem, volta-se à alternativa (a) (rota HTTP do auxiliar do Jarvis, porta 47811, `viewer-link.json`), que não será construída agora.
