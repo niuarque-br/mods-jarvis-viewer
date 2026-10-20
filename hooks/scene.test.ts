@@ -110,3 +110,38 @@ test('destaque de gráfico usa série#índice', () => {
   expect(errs({ ...g, steps: [{ say: 'x', highlight: ['v#3'] }] })).toContain('steps[0].highlight: id "v#3" não existe')
 })
 test('entrada que não é objeto', () => expect(errs(null)).toEqual(['cena: precisa ser um objeto']))
+
+const META = (over: Record<string, unknown> = {}, action: Record<string, unknown> = {}) => ({
+  title: 'M',
+  type: 'metafora',
+  objects: [{ id: 'o', shape: 'caixa', pos: [0, 0, 0], ...over }],
+  steps: [{ say: 'x', actions: [{ target: 'o', do: 'mover', to: [1, 0, 0], ...action }] }],
+})
+test('metafora: pos com 3 números finitos', () => {
+  expect(errs(META({ pos: [0, 0] }))).toContain('objects[0].pos: precisa ser [x, y, z] com números')
+  expect(errs(META({ pos: [0, 0, 'a'] }))).toContain('objects[0].pos: precisa ser [x, y, z] com números')
+  expect(errs(META({ pos: [0, 0, null] }))).toContain('objects[0].pos: precisa ser [x, y, z] com números')
+  expect(errs(META({ pos: [0, Infinity, 0] }))).toContain('objects[0].pos: precisa ser [x, y, z] com números')
+})
+test('metafora: coordenadas até 20 em módulo', () => {
+  expect(errs(META({ pos: [20, -20, 20] }))).toEqual([])
+  expect(errs(META({ pos: [21, 0, 0] }))).toContain('objects[0].pos: cada coordenada entre -20 e 20')
+  expect(errs(META({ pos: [0, -20.5, 0] }))).toContain('objects[0].pos: cada coordenada entre -20 e 20')
+})
+test('metafora: ms entre 100 e 10000', () => {
+  expect(errs(META({}, { ms: 100 }))).toEqual([])
+  expect(errs(META({}, { ms: 10000 }))).toEqual([])
+  expect(errs(META({}, { ms: 99 }))).toContain('steps[0].actions[0].ms: entre 100 e 10000')
+  expect(errs(META({}, { ms: 10001 }))).toContain('steps[0].actions[0].ms: entre 100 e 10000')
+  expect(errs(META({}, { ms: 'rápido' }))).toContain('steps[0].actions[0].ms: precisa ser número')
+  expect(errs(META({}, { ms: NaN }))).toContain('steps[0].actions[0].ms: entre 100 e 10000')
+})
+test('metafora: cor no formato #rrggbb', () => {
+  expect(errs(META({ color: '#D97757' }))).toEqual([])
+  expect(errs(META({ color: 'vermelho' }))).toContain('objects[0].color: precisa ser uma cor no formato #rrggbb')
+  expect(errs(META({ color: '#fff' }))).toContain('objects[0].color: precisa ser uma cor no formato #rrggbb')
+  expect(errs(META({ color: '#12345g' }))).toContain('objects[0].color: precisa ser uma cor no formato #rrggbb')
+  expect(errs(META({ color: 5 }))).toContain('objects[0].color: precisa ser texto')
+})
+test('metafora: ação com alvo inexistente é recusada', () =>
+  expect(errs(META({}, { target: 'zz' }))).toContain('steps[0].actions[0].target: id "zz" não existe'))

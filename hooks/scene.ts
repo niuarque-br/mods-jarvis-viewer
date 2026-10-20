@@ -12,7 +12,7 @@ export const SCENE_TYPES = [
 ] as const
 export type SceneType = (typeof SCENE_TYPES)[number]
 
-export const LIMITS = { steps: 12, pieces: 40, say: 200, chartPoints: 100 } as const
+export const LIMITS = { steps: 12, pieces: 40, say: 200, chartPoints: 100, coord: 20, msMin: 100, msMax: 10000 } as const
 
 export type MetaphorAction = {
   target: string
@@ -155,8 +155,11 @@ function checkBody(c: Check, scene: Obj, type: SceneType): void {
       nodes('objects', (n, p) => {
         c.oneOf(n, 'shape', p, META_SHAPES, true)
         c.vec3(n.pos, `${p}.pos`)
+        if (Array.isArray(n.pos) && n.pos.length === 3 && n.pos.every(isNum) && n.pos.some((x) => Math.abs(x) > LIMITS.coord))
+          c.err(`${p}.pos`, `cada coordenada entre -${LIMITS.coord} e ${LIMITS.coord}`)
         c.optional(n, 'size', p, 'number')
         c.optional(n, 'color', p, 'string')
+        if (isStr(n.color) && !/^#[0-9a-fA-F]{6}$/.test(n.color)) c.err(`${p}.color`, 'precisa ser uma cor no formato #rrggbb')
         c.optional(n, 'text', p, 'string')
         if (n.shape === 'texto' && (!isStr(n.text) || n.text === '')) c.err(`${p}.text`, 'obrigatório para shape "texto"')
       }, false)
@@ -326,6 +329,8 @@ function checkSteps(c: Check, scene: Obj, type: SceneType): void {
             else a.path.forEach((pt, k) => c.vec3(pt, `${ap}.path[${k}]`))
           }
           c.optional(a, 'ms', ap, 'number')
+          if (isNum(a.ms) && (a.ms < LIMITS.msMin || a.ms > LIMITS.msMax)) c.err(`${ap}.ms`, `entre ${LIMITS.msMin} e ${LIMITS.msMax}`)
+          else if (typeof a.ms === 'number' && !isNum(a.ms)) c.err(`${ap}.ms`, `entre ${LIMITS.msMin} e ${LIMITS.msMax}`)
         })
     }
   })

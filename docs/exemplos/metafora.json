@@ -1,0 +1,22 @@
+{
+  "title": "Uma fila: quem chega primeiro sai primeiro",
+  "type": "metafora",
+  "objects": [
+    { "id": "guiche", "shape": "cilindro", "pos": [6, 0, 0], "size": 1.6, "color": "#5B8DEF", "label": "Guichê", "detail": "Atende uma pessoa por vez." },
+    { "id": "rotulo", "shape": "texto", "pos": [-1, 2.4, 0], "text": "Fila (FIFO)" },
+    { "id": "p1", "shape": "caixa", "pos": [4, 0, 0], "color": "#D97757", "label": "1º" },
+    { "id": "p2", "shape": "caixa", "pos": [2, 0, 0], "color": "#E5B94E", "label": "2º" },
+    { "id": "p3", "shape": "caixa", "pos": [0, 0, 0], "color": "#36C5A0", "label": "3º" },
+    { "id": "p4", "shape": "caixa", "pos": [-2, 0, 0], "color": "#B58AE6", "label": "4º" },
+    { "id": "chegada", "shape": "esfera", "pos": [-8, 0, 0], "size": 0.6, "color": "#E86A92" },
+    { "id": "brilho", "shape": "particulas", "pos": [6, 0, 0], "size": 1.4, "color": "#62C7E8" }
+  ],
+  "steps": [
+    { "say": "Uma fila é uma linha de espera: cada novo item entra no fim e só o do começo é atendido.", "focus": ["rotulo", "p1", "p2", "p3", "p4"] },
+    { "focus": ["p1", "guiche"], "say": "O primeiro da fila vai para o guichê, porque foi o primeiro a chegar.", "actions": [{ "target": "p1", "do": "mover", "to": [6, 0, 0], "ms": 1400 }, { "target": "guiche", "do": "pulsar", "ms": 1400 }] },
+    { "focus": ["p1"], "say": "Depois de atendido, ele sai da fila e sobe, sumindo.", "actions": [{ "target": "p1", "do": "seguir", "path": [[6, 2, 0], [6, 4, 0]], "ms": 1200 }, { "target": "p1", "do": "sumir", "ms": 1200 }] },
+    { "focus": ["p2", "p3", "p4"], "say": "Todos avançam uma posição, mantendo a ordem de chegada.", "actions": [{ "target": "p2", "do": "mover", "to": [4, 0, 0] }, { "target": "p3", "do": "mover", "to": [2, 0, 0] }, { "target": "p4", "do": "mover", "to": [0, 0, 0] }] },
+    { "focus": ["chegada"], "say": "Chega alguém novo e entra no fim da fila.", "actions": [{ "target": "chegada", "do": "mover", "to": [-2, 0, 0], "ms": 1500 }, { "target": "chegada", "do": "girar", "ms": 1500 }] },
+    { "focus": ["brilho", "p2"], "say": "O guichê chama o próximo, e a fila anda de novo.", "actions": [{ "target": "p2", "do": "mover", "to": [6, 0, 0], "ms": 1400 }, { "target": "brilho", "do": "aparecer", "ms": 1400 }] }
+  ]
+}

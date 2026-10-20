@@ -139,7 +139,7 @@ export function createStage(container, { theme } = {}) {
     p.object.getWorldPosition(lv)
     lv.y += p.off
     lv.project(camera)
-    p.labelEl.style.display = lv.z < 1 ? '' : 'none'
+    p.labelEl.style.display = lv.z < 1 && p.object.visible ? '' : 'none' // peça escondida não mostra rótulo
     p.labelEl.style.left = ((lv.x + 1) / 2) * w + 'px'
     p.labelEl.style.top = ((1 - lv.y) / 2) * h + 'px'
   }
@@ -205,7 +205,7 @@ export function createStage(container, { theme } = {}) {
     const r = canvas.getBoundingClientRect()
     ndc.set(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1)
     ray.setFromCamera(ndc, camera)
-    const objs = [...pieces.values()].map((p) => p.object)
+    const objs = [...pieces.values()].filter((p) => p.object.visible).map((p) => p.object) // peça escondida não recebe clique
     for (const h of ray.intersectObjects(objs, true)) {
       const id = owners.get(h.object)
       if (id !== undefined) return id
