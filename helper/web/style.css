@@ -1,0 +1,40 @@
+:root {
+  color-scheme: light dark;
+  --bg: #f6f7fa; --fg: #161a23; --dim: #5d667a; --panel: #ffffff; --line: #d6dbe5; --line-hover: #aab3c5;
+  --accent: #c4552f; --on-accent: #ffffff; --caption-bg: rgba(255, 255, 255, .92); --error: #b3261e;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b0d12; --fg: #e8ecf3; --dim: #8a93a6; --panel: #141821; --line: #232a37; --line-hover: #3a4458;
+    --accent: #D97757; --on-accent: #1a0d07; --caption-bg: rgba(20, 24, 33, .88); --error: #ff8a80;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 15px/1.45 "Segoe UI", system-ui, sans-serif; overflow: hidden; }
+#stage { position: fixed; inset: 0; }
+#stage canvas { display: block; }
+header { position: fixed; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 10px; padding: 14px 18px;
+         background: linear-gradient(var(--bg) 40%, transparent); z-index: 2; flex-wrap: wrap; }
+header h1 { font-size: 15px; font-weight: 600; margin: 0; flex: 1; min-width: 140px; }
+header h1 span { color: var(--dim); font-weight: 400; }
+#narr-wrap { font-size: 13px; color: var(--dim); display: flex; align-items: center; gap: 6px; }
+#narr-wrap small { font-size: 12px; }
+button { background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px;
+         font: inherit; font-size: 13px; cursor: pointer; }
+button:hover:not(:disabled) { border-color: var(--line-hover); }
+button:disabled { opacity: .45; cursor: default; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+#caption { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); width: min(760px, calc(100% - 32px));
+           background: var(--caption-bg); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; z-index: 2;
+           backdrop-filter: blur(6px); min-height: 56px; }
+#caption .step { color: var(--dim); font-size: 12px; margin-bottom: 4px; letter-spacing: .04em; text-transform: uppercase; }
+#caption .text { font-size: 17px; }
+#caption.error .text { color: var(--error); }
+#dots { display: flex; gap: 6px; margin-top: 10px; }
+#dots button { flex: 1; height: 10px; padding: 0; border: 0; border-radius: 2px; background: transparent; position: relative; }
+#dots button::before { content: ""; position: absolute; left: 0; right: 0; top: 3px; height: 3px; border-radius: 2px; background: var(--line); }
+#dots button.done::before { background: var(--accent); }
+#dots button.now::before { box-shadow: 0 0 0 1px var(--accent); }
+#lost { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); z-index: 3; background: var(--panel);
+        border: 1px solid var(--error); color: var(--error); border-radius: 8px; padding: 8px 14px; font-size: 13px; }
+#lost[hidden], #narr-hint[hidden] { display: none; }

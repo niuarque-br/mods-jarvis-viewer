@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Jarvis Viewer</title>
+<script>
+  // Toda rota do auxiliar exige o token (?t=). Os módulos importam por caminho absoluto sem token,
+  // então o mapa de importação acrescenta o token a cada um. Cena nova = uma linha em SCENES.
+  (function () {
+    var t = new URLSearchParams(location.search).get('t') || ''
+    var q = '?t=' + encodeURIComponent(t)
+    var SCENES = ['arquitetura', 'fluxo', 'grafico', 'timeline', 'sequencia', 'estados', 'camadas', 'arvore', 'comparacao', 'metafora']
+    var FILES = ['/core.js', '/app.js', '/engine/stage.js', '/engine/layout.js', '/vendor/three.module.min.js']
+    SCENES.forEach(function (s) { FILES.push('/scenes/' + s + '.js') })
+    var imports = {}
+    FILES.forEach(function (f) { imports[f] = f + q })
+    imports['three'] = '/vendor/three.module.min.js' + q
+    var map = document.createElement('script')
+    map.type = 'importmap'
+    map.textContent = JSON.stringify({ imports: imports })
+    document.head.appendChild(map)
+    var css = document.createElement('link')
+    css.rel = 'stylesheet'
+    css.href = '/style.css' + q
+    document.head.appendChild(css)
+    var app = document.createElement('script')
+    app.type = 'module'
+    app.src = '/app.js' + q
+    document.head.appendChild(app)
+  })()
+</script>
+</head>
+<body>
+<div id="stage"></div>
+<div id="lost" hidden>viewer desligado — peça uma cena para religar</div>
+<header>
+  <h1 id="title">Jarvis Viewer <span>· aguardando uma cena</span></h1>
+  <button id="hprev" title="Cena anterior" disabled>←</button>
+  <button id="hnext" title="Próxima cena" disabled>→</button>
+  <label id="narr-wrap"><input type="checkbox" id="narr" checked> <span id="narr-label">🔊 Narração</span><small id="narr-hint" hidden>narrado pelo Jarvis</small></label>
+  <button id="restart" title="Recomeçar">⟲ Recomeçar</button>
+  <button id="play" class="primary" disabled>▶ Explicar</button>
+</header>
+<div id="caption">
+  <div class="step" id="stepn">Pronto</div>
+  <div class="text" id="text">Peça uma cena ao Claude: ela aparece aqui e é explicada passo a passo.</div>
+  <div id="dots"></div>
+</div>
+</body>
+</html>
