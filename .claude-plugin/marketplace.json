@@ -1,0 +1,13 @@
+{
+  "name": "mods-jarvis-viewer",
+  "owner": {
+    "name": "Niuarque Batista"
+  },
+  "description": "Viewer 3D: o Claude explica mostrando cenas animadas",
+  "plugins": [
+    {
+      "name": "jarvis-viewer",
+      "source": "./"
+    }
+  ]
+}

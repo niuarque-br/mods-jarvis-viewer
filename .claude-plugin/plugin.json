@@ -1,0 +1,23 @@
+{
+  "name": "jarvis-viewer",
+  "version": "0.1.0",
+  "description": "Viewer 3D: o Claude explica mostrando cenas animadas no navegador embutido, com narração",
+  "author": { "name": "Niuarque Batista" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "presentation": {
+      "type": "string",
+      "title": "Apresentação",
+      "description": "IA escolhe decide sozinha quando mostrar uma cena; Sob demanda só mostra quando você pedir",
+      "default": "IA escolhe",
+      "options": ["IA escolhe", "Sob demanda"]
+    },
+    "narration": {
+      "type": "string",
+      "title": "Narração",
+      "description": "Lê em voz alta o texto de cada passo",
+      "default": "ligada",
+      "options": ["ligada", "desligada"]
+    }
+  }
+}
