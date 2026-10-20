@@ -1,5 +1,6 @@
-import type { Register } from 'claude-code'
+import type { PluginOptions, Register } from 'claude-code'
 
+import { guidance, viewerPrompt } from './guidance'
 import { startHelper } from './helper'
 import type { HelperHandle } from './helper'
 import { LIMITS, SCENE_TYPES, validateScene } from './scene'
@@ -52,14 +53,26 @@ let handle: HelperHandle | undefined
 let starting: Promise<HelperHandle> | undefined
 let lastHandle: HelperHandle | undefined
 
-export const register: Register = on => {
+export const register: Register = (on, options: PluginOptions) => {
   on('session.start', async ($, e, next) => {
     await shutdown()
     lastScene = null
     counter = 0
     lastHandle = undefined
     await $.tool.register({ name: 'mostrar_cena', description: TOOL_DESCRIPTION, inputSchema: TOOL_SCHEMA, isDeferred: false })
+    await $.command.register({ name: 'viewer', description: 'Mostra no viewer a explicação anterior ou um assunto' })
     return next(e)
+  })
+
+  on('command.run', { command: 'viewer' }, async ($, e) => {
+    await $.prompt.submit({ text: viewerPrompt(e.args), asUser: true })
+    return { text: 'Pedindo a cena ao Claude…' }
+  })
+
+  on('prompt.compose', async ($, e, next) => {
+    const composed = await next(e)
+    const mode = String(options?.presentation ?? 'IA escolhe')
+    return { ...composed, sections: [...composed.sections, { id: 'jarvis-viewer', text: guidance(mode), scope: 'session' as const }] }
   })
 
   on('session.end', async ($, e, next) => {

@@ -11,6 +11,7 @@ export type World = {
   urls: string[]
   submitted: string[]
   origins: unknown[]
+  commands: { name: string; description: string }[]
   registered: { name: string; description: string; inputSchema?: Record<string, unknown> }[]
   store: Map<string, unknown>
   pages: number
@@ -44,6 +45,7 @@ export function world(on: On, opts: WorldOptions = {}): World {
     urls: [],
     submitted: [],
     origins: [],
+    commands: [],
     registered: [],
     store: new Map(Object.entries(opts.store ?? {})),
     pages: opts.pages ?? 0,
@@ -61,6 +63,10 @@ export function world(on: On, opts: WorldOptions = {}): World {
   on('tool.register', async ($, e) => {
     calls.registered.push(e)
     return { value: { tool: `mcp__${$.plugin.name}__${e.name}` } }
+  })
+  on('command.register', async ($, e) => {
+    calls.commands.push(e)
+    return { value: { command: e.name } }
   })
   on('fs.exists', async () => ({ value: !!opts.exe }))
   on('http.fetch', async ($, e) => {
