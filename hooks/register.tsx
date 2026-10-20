@@ -4,7 +4,8 @@ import { guidance, viewerPrompt } from './guidance'
 import { startHelper } from './helper'
 import type { HelperHandle } from './helper'
 import { NARRATION_KEY, chooseNarrator, narrationOn } from './narration'
-import { LIMITS, SCENE_TYPES, validateScene } from './scene'
+import { PickQueue } from './picks'
+import { LIMITS, SCENE_TYPES, pieceLabel, validateScene } from './scene'
 import type { Scene } from './scene'
 
 export const TOOL = 'mcp__jarvis-viewer__mostrar_cena'
@@ -53,6 +54,8 @@ let counter = 0
 let handle: HelperHandle | undefined
 let starting: Promise<HelperHandle> | undefined
 let lastHandle: HelperHandle | undefined
+let mainTurn: string | undefined
+let picks = new PickQueue()
 
 export const register: Register = (on, options: PluginOptions) => {
   on('session.start', async ($, e, next) => {
@@ -60,6 +63,8 @@ export const register: Register = (on, options: PluginOptions) => {
     lastScene = null
     counter = 0
     lastHandle = undefined
+    mainTurn = undefined
+    picks = new PickQueue()
     await $.tool.register({ name: 'mostrar_cena', description: TOOL_DESCRIPTION, inputSchema: TOOL_SCHEMA, isDeferred: false })
     await $.command.register({ name: 'viewer', description: 'Mostra no viewer a explicação anterior ou um assunto' })
     return next(e)
@@ -76,6 +81,23 @@ export const register: Register = (on, options: PluginOptions) => {
     const composed = await next(e)
     const mode = String(options?.presentation ?? 'IA escolhe')
     return { ...composed, sections: [...composed.sections, { id: 'jarvis-viewer', text: guidance(mode), scope: 'session' as const }] }
+  })
+
+  on('turn.start', async ($, e, next) => {
+    const started = await next(e)
+    if (e.agentId === undefined) mainTurn = e.turnId
+    return started
+  })
+
+  on('turn.complete', async ($, e, next) => {
+    const result = await next(e)
+    if (e.agentId === undefined && e.turnId === mainTurn) {
+      mainTurn = undefined
+      const text = picks.turnEnded()
+      // Not awaited: the host refuses a submit made while this hook holds the turn.
+      if (text !== null) void $.prompt.submit({ text, asUser: true })
+    }
+    return result
   })
 
   on('session.end', async ($, e, next) => {
@@ -175,6 +197,16 @@ function launch($: Parameters<typeof startHelper>[0], options: PluginOptions | u
               // helper gone; nothing to tell
             }
           })()
+          return
+        }
+        if (event.type === 'pick') {
+          const sceneId = event.scene as unknown
+          const node = event.node as unknown
+          if (typeof sceneId !== 'string' || typeof node !== 'string' || !lastScene || lastScene.id !== sceneId) return
+          const label = pieceLabel(lastScene.scene, node) ?? node
+          const out = picks.pick(`Explique a parte «${label}» da cena «${lastScene.scene.title}».`, mainTurn !== undefined)
+          if (out.submit !== undefined) void $.prompt.submit({ text: out.submit, asUser: true })
+          if (out.caption !== undefined) void mine?.send({ type: 'caption', text: out.caption }).catch(() => undefined)
           return
         }
         if (event.type !== 'exit' && event.type !== 'error') return
