@@ -202,3 +202,51 @@ test('isUserPiece recusa ids internos (__) e não-strings', () => {
   assert.equal(isUserPiece(''), false)
   assert.equal(isUserPiece(undefined), false)
 })
+
+// ---- revisão final ----
+import { routeStep, StepGate, voiceHoldMs } from '../core.js'
+
+test('mode para jarvis corta a voz da página e espera o ▶ (I1)', () => {
+  const r = nextAction(base({ busy: true, playing: true }), { type: 'mode', narrator: 'jarvis' })
+  assert.deepEqual(kinds(r), ['stop-speech'])
+  assert.equal(r.state.narrator, 'jarvis')
+  assert.equal(r.state.playing, false)
+  // ▶ depois disso pede ao Jarvis para retomar (resume), sem voz da página
+  const p = nextAction({ ...r.state, busy: false, done: true }, { type: 'ui-play' })
+  assert.deepEqual(p.actions, [{ type: 'post', event: { type: 'resume', step: 0 } }])
+})
+
+test('routeStep: com a cena ao vivo na tela aplica; carregando guarda; outra cena na tela volta à ao vivo (I5)', () => {
+  assert.equal(routeStep({ loading: null, shown: 's1', live: 's1' }), 'apply')
+  assert.equal(routeStep({ loading: 's2', shown: null, live: 's2' }), 'hold')
+  assert.equal(routeStep({ loading: 's1', shown: null, live: 's2' }), 'show-live')
+  assert.equal(routeStep({ loading: null, shown: 's1', live: 's2' }), 'show-live')
+  assert.equal(routeStep({ loading: null, shown: null, live: null }), 'apply')
+})
+
+test('StepGate: advance que chega durante o carregamento é aplicado depois, em ordem (I5)', () => {
+  const g = new StepGate()
+  assert.equal(g.offer({ type: 'advance', step: 0 }, { loading: 's2', shown: null, live: 's2' }), 'hold')
+  assert.equal(g.offer({ type: 'goto', step: 1 }, { loading: 's2', shown: null, live: 's2' }), 'hold')
+  assert.deepEqual(g.loaded('s2', 's2'), [{ type: 'advance', step: 0 }, { type: 'goto', step: 1 }])
+  assert.deepEqual(g.loaded('s2', 's2'), [])
+})
+
+test('StepGate: o que esperava pela cena ao vivo não vai para outra cena; clear esquece (I5)', () => {
+  const g = new StepGate()
+  assert.equal(g.offer({ type: 'advance', step: 1 }, { loading: null, shown: 's1', live: 's2' }), 'show-live')
+  assert.deepEqual(g.loaded('s1', 's2'), [])
+  assert.deepEqual(g.loaded('s2', 's2'), [{ type: 'advance', step: 1 }])
+  assert.equal(g.offer({ type: 'advance', step: 0 }, { loading: 's3', shown: null, live: 's3' }), 'hold')
+  g.clear()
+  assert.deepEqual(g.loaded('s3', 's3'), [])
+  assert.equal(g.offer({ type: 'advance', step: 0 }, { loading: null, shown: 's3', live: 's3' }), 'apply')
+  assert.deepEqual(g.loaded('s3', 's3'), [])
+})
+
+test('voiceHoldMs: voz que falha logo mantém o tempo mínimo da legenda (M6)', () => {
+  assert.equal(voiceHoldMs('x'.repeat(40), 100, true), 55 * 40 - 100)
+  assert.equal(voiceHoldMs('x'.repeat(40), 5000, true), 0)
+  assert.equal(voiceHoldMs('x'.repeat(40), 100, false), 0)
+  assert.equal(voiceHoldMs(undefined, 0, true), 0)
+})

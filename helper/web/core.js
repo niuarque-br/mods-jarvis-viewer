@@ -20,7 +20,7 @@
 //   'restart'                               botão ⟲
 //   'pause'                                 comando do helper: corta a fala e para (não posta nada)
 //   'ui-pause' / 'ui-play'                  botões ⏸ / ▶ (postam paused / resume com jarvis)
-//   'mode'       {narrator}                 helper trocou o narrador (ex.: Jarvis caiu → 'page')
+//   'mode'       {narrator}                 helper trocou o narrador (ex.: Jarvis caiu → 'page'; Jarvis entrou → corta a voz e espera o ▶)
 //   'narration'  {on}                       interruptor Narração/Legenda (ignorado com jarvis)
 //   'anim-done' / 'voice-done'              as duas metades do passo terminaram (sem voz: voice-done já)
 //
@@ -33,6 +33,45 @@
 export function stepMs(animMs, say, narrator) {
   if (narrator === 'caption') return Math.max(animMs, 55 * String(say ?? '').length)
   return animMs
+}
+
+// Voz da página que falhou (erro logo no começo) não encurta o passo: segura o tempo de leitura da legenda.
+export function voiceHoldMs(say, elapsedMs, failed) {
+  if (!failed) return 0
+  return Math.max(0, 55 * String(say ?? '').length - elapsedMs)
+}
+
+// advance/goto do auxiliar valem só para a cena ao vivo já montada na tela.
+// view = { loading, shown, live }: ids da cena carregando, da que está na tela e da última mandada pelo auxiliar.
+//   'apply'     aplica agora
+//   'hold'      a cena ao vivo ainda carrega: guarda até ela estar montada
+//   'show-live' outra cena na tela (histórico) ou carregando: volta à ao vivo e guarda
+export function routeStep({ loading, shown, live }) {
+  if (loading != null) return live == null || loading === live ? 'hold' : 'show-live'
+  if (live != null && shown !== live) return 'show-live'
+  return 'apply'
+}
+
+export class StepGate {
+  constructor() {
+    this.held = []
+  }
+  // devolve a rota; o que não é 'apply' fica guardado
+  offer(cmd, view) {
+    const route = routeStep(view)
+    if (route !== 'apply') this.held.push(cmd)
+    return route
+  }
+  // a cena `id` acabou de ser montada: devolve, em ordem, o que esperava pela cena ao vivo
+  loaded(id, live) {
+    if (live != null && id !== live) return []
+    const out = this.held
+    this.held = []
+    return out
+  }
+  clear() {
+    this.held = []
+  }
 }
 
 // Peças internas (ids com «__», como a legenda da rosca) nunca viram nó do usuário.
@@ -146,7 +185,8 @@ export function nextAction(state, event) {
     }
     case 'mode': {
       const narrator = event.narrator || s.narrator
-      if (narrator === 'jarvis') return { state: { ...s, narrator, playing: false }, actions: [] }
+      // o Jarvis assumiu: a página cala e espera o ▶ (resume) — nunca duas vozes
+      if (narrator === 'jarvis') return { state: { ...s, narrator, playing: false }, actions: [{ type: 'stop-speech' }] }
       if (s.narrator !== 'jarvis') return { state: { ...s, narrator }, actions: [] }
       // o Jarvis saiu: a página assume daqui
       if (s.busy) return { state: { ...s, narrator, playing: true }, actions: [] }

@@ -1,6 +1,6 @@
 // Cola da página: SSE, controles, legenda e fala. A lógica de reprodução está em core.js (puro).
 // Conclusão de passo é por relógio (setTimeout/Promise), nunca por contagem de quadros (rAF para em aba de fundo).
-import { History, nextAction, stepMs, pickVoice, isUserPiece } from './core.js'
+import { History, nextAction, stepMs, pickVoice, isUserPiece, StepGate, voiceHoldMs } from './core.js'
 import { createStage, systemTheme } from './engine/stage.js'
 
 // O token vai no caminho (/TOKEN/): todas as URLs são relativas, sem token no código.
@@ -22,6 +22,9 @@ let runId = 0
 let narrationPref = true
 let liveNarrator = 'page' // narrador que o auxiliar mandou por último
 let loadSeq = 0
+let liveId = null // cena ao vivo: a última que o auxiliar mandou (scene/play)
+let loadingId = null // cena sendo montada agora
+const gate = new StepGate() // advance/goto que esperam a cena ao vivo estar montada
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -49,18 +52,20 @@ export function pick(node) {
 window.jarvisViewer = { pick }
 
 // ---------- fala ----------
+// Resolve true quando a voz terminou (ou foi cortada), false quando falhou.
 function speak(text, rid) {
   return new Promise((resolve) => {
     const ss = window.speechSynthesis
-    if (!ss || typeof SpeechSynthesisUtterance === 'undefined') return wait(55 * text.length).then(resolve)
+    if (!ss || typeof SpeechSynthesisUtterance === 'undefined') return wait(55 * text.length).then(() => resolve(true))
     let finished = false
-    const finish = () => { if (!finished) { finished = true; resolve() } }
+    const finish = (ok = true) => { if (!finished) { finished = true; resolve(ok) } }
     const u = new SpeechSynthesisUtterance(text)
     u.lang = 'pt-BR'
     u.rate = 1.05
     const voice = pickVoice(ss.getVoices())
     if (voice) u.voice = voice
-    u.onend = u.onerror = finish
+    u.onend = () => finish(true)
+    u.onerror = (e) => finish(e?.error === 'interrupted' || e?.error === 'canceled')
     setTimeout(() => { if (!finished && rid === runId) ss.cancel(); finish() }, 90 * text.length + 3000) // voz que não termina não trava a cena
     ss.speak(u)
   })
@@ -105,7 +110,11 @@ function runStep(i) {
   const anim = minimum > 0 ? Promise.all([play, wait(minimum)]) : play
   anim.then(() => { if (rid === runId) apply({ type: 'anim-done' }) })
 
-  const voice = narrator === 'page' && say ? speak(say, rid) : Promise.resolve()
+  // voz que falha logo não encurta o passo: segura o tempo de leitura da legenda
+  const started = performance.now()
+  const voice = narrator === 'page' && say
+    ? speak(say, rid).then((ok) => wait(voiceHoldMs(say, performance.now() - started, !ok)))
+    : Promise.resolve()
   voice.then(() => { if (rid === runId) apply({ type: 'voice-done' }) })
 }
 
@@ -120,6 +129,7 @@ function showError(message) {
 
 async function load(item, event) {
   const seq = ++loadSeq
+  loadingId = item.id
   runId++
   stopSpeech()
   el.caption.classList.remove('error')
@@ -135,7 +145,7 @@ async function load(item, event) {
     if (!SCENE_TYPE.test(type)) throw new Error('tipo ausente')
     mod = await import(`./scenes/${type}.js`)
   } catch {
-    if (seq === loadSeq) showError(`Não conheço o tipo de cena «${type || '?'}».`)
+    if (seq === loadSeq) loadFailed(`Não conheço o tipo de cena «${type || '?'}».`)
     return
   }
   if (seq !== loadSeq) return
@@ -145,15 +155,34 @@ async function load(item, event) {
     built = mod.build(scene, stage)
   } catch (e) {
     console.error(e)
-    return showError(`Não consegui montar a cena «${scene.title || type}».`)
+    return loadFailed(`Não consegui montar a cena «${scene.title || type}».`)
   }
   current = { id: item.id, scene, mod, built }
   const steps = Array.isArray(scene.steps) ? scene.steps : []
-  if (!steps.length) return showError('A cena não tem passos.')
+  if (!steps.length) return loadFailed('A cena não tem passos.')
   buildDots(steps.length)
   el.stepn.textContent = 'Pronto'
   el.text.textContent = steps[0].say || ''
+  loadingId = null
   apply({ ...event, total: steps.length })
+  // o que o auxiliar mandou enquanto a cena carregava vale agora, em ordem
+  for (const cmd of gate.loaded(item.id, liveId)) stepCommand(cmd)
+}
+
+function loadFailed(message) {
+  loadingId = null
+  gate.clear()
+  showError(message)
+}
+
+// advance/goto do auxiliar: só para a cena ao vivo já montada; senão espera por ela (ou volta a ela)
+function stepCommand(cmd) {
+  const route = gate.offer(cmd, { loading: loadingId, shown: loadingId == null ? current?.id ?? null : null, live: liveId })
+  if (route === 'apply') return apply(cmd)
+  if (route !== 'show-live') return
+  const item = history.goto(liveId)
+  if (!item) return gate.clear()
+  load(item, { type: 'scene', narrator: liveNarrator, from: cmd.step })
 }
 
 let reconnected = false
@@ -161,6 +190,8 @@ function onScene(msg) {
   const same = current && msg.id === current.id
   const narrator = msg.narrator || state.narrator
   liveNarrator = narrator
+  liveId = msg.id
+  gate.clear() // comandos de uma cena anterior não valem para esta
   if (same && reconnected) {
     // a página voltou a ouvir e o auxiliar reenviou a cena que já está na tela: recomeça no passo 1
     reconnected = false
@@ -176,20 +207,21 @@ function onCommand(msg) {
   switch (msg.type) {
     case 'scene': return onScene(msg)
     case 'play': {
+      liveId = msg.id
       const cur = history.current()
       if (cur && cur.id === msg.id && current) return apply({ type: 'scene', narrator: state.narrator, total: state.total, from: msg.from ?? 0 })
       const item = history.goto(msg.id)
       if (!item) return
       return load(item, { type: 'scene', narrator: liveNarrator, from: msg.from ?? 0 })
     }
-    case 'goto': return apply({ type: 'goto', step: msg.step })
-    case 'advance': return apply({ type: 'advance', step: msg.step })
+    case 'goto': return stepCommand({ type: 'goto', step: msg.step })
+    case 'advance': return stepCommand({ type: 'advance', step: msg.step })
     case 'pause': return apply({ type: 'pause' })
     case 'mode': {
       if (typeof msg.narration === 'boolean') narrationPref = msg.narration
       if (msg.narrator) liveNarrator = msg.narrator
       apply({ type: 'mode', narrator: msg.narrator })
-      if (typeof msg.from === 'number') apply({ type: 'goto', step: msg.from })
+      if (typeof msg.from === 'number') stepCommand({ type: 'goto', step: msg.from })
       return
     }
     case 'caption':
@@ -218,10 +250,12 @@ function buildDots(n) {
 
 function render() {
   const jarvis = state.narrator === 'jarvis'
-  if (!jarvis) narrationPref = state.narrator === 'page'
+  // com o Jarvis narrando ao vivo, a página nunca liga a própria voz (nem numa cena do histórico)
+  const locked = jarvis || liveNarrator === 'jarvis'
+  if (!locked) narrationPref = state.narrator === 'page'
   el.narr.checked = narrationPref
-  el.narr.disabled = jarvis
-  el.narrHint.hidden = !jarvis
+  el.narr.disabled = locked
+  el.narrHint.hidden = !locked
   el.narrLabel.textContent = narrationPref ? '🔊 Narração' : '💬 Legenda'
   el.play.disabled = state.total === 0
   el.play.textContent = state.playing ? '⏸ Pausar' : (state.done || state.busy || state.step > 0 ? '▶ Continuar' : '▶ Explicar')
@@ -238,9 +272,10 @@ el.restart.addEventListener('click', () => apply({ type: 'restart' }))
 el.narr.addEventListener('change', () => { narrationPref = el.narr.checked; apply({ type: 'narration', on: el.narr.checked }) })
 function navigate(item) {
   if (!item) return
-  // Com o Jarvis narrando, uma cena antiga esperaria um advance que nunca vem: reabre com narração local, parada no passo 1.
+  // Com o Jarvis narrando, uma cena antiga esperaria um advance que nunca vem: reabre só com legenda
+  // (nunca a voz da página com o Jarvis ligado, R21), parada no passo 1.
   const old = liveNarrator === 'jarvis' && history.hasNext()
-  const narrator = old ? (narrationPref ? 'page' : 'caption') : liveNarrator
+  const narrator = old ? 'caption' : liveNarrator
   load(item, { type: 'scene', narrator, from: 0, paused: old })
 }
 el.prev.addEventListener('click', () => navigate(history.prev()))

@@ -215,9 +215,12 @@ def make_server(
             srv = self.server
             with srv.state_lock:
                 if kind == "scene":
+                    # the old scene's mode does not belong to the new one
                     srv.last_scene = data
+                    srv.last_mode = None
                 elif kind == "mode":
-                    srv.last_mode = data
+                    # a reopened page starts at step 1: the `from` was for the page that was open
+                    srv.last_mode = {k: v for k, v in data.items() if k != "from"}
                 srv.bus.publish(data)
             self._send(204)
             if kind == "quit" and srv.on_quit:

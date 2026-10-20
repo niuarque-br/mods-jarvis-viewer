@@ -310,3 +310,29 @@ def test_prefixo_events_e_event(helper):
     conn2.close()
     conn.close()
     assert {"type": "pick", "node": "a"} in helper[1].events()
+
+
+def test_cena_nova_esquece_o_mode_anterior(helper):
+    # M1: a mode of the old scene must not reach a page that opens on the new one
+    post_cmd(helper, {"type": "scene", "scene": {"id": "velha"}})
+    post_cmd(helper, {"type": "mode", "narrator": "page", "narration": True, "from": 2})
+    post_cmd(helper, {"type": "scene", "scene": {"id": "nova"}, "narrator": "jarvis"})
+    page = Page(helper)
+    assert page.next() == {"type": "scene", "scene": {"id": "nova"}, "narrator": "jarvis"}
+    post_cmd(helper, {"type": "caption", "text": "depois"})
+    assert page.next() == {"type": "caption", "text": "depois"}
+    page.close()
+
+
+def test_mode_reenviado_sem_from(helper):
+    # M1: a reopened page starts at step 1; the fallback's `from` belonged to the old page
+    post_cmd(helper, {"type": "scene", "scene": {"id": "s1"}})
+    page = Page(helper)
+    page.next()
+    post_cmd(helper, {"type": "mode", "narrator": "page", "narration": True, "from": 2})
+    assert page.next() == {"type": "mode", "narrator": "page", "narration": True, "from": 2}
+    page.close()
+    again = Page(helper)
+    assert again.next()["type"] == "scene"
+    assert again.next() == {"type": "mode", "narrator": "page", "narration": True}
+    again.close()

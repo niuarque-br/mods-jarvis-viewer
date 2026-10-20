@@ -252,9 +252,10 @@ export function build(scene, stage) {
       if (chart === 'barras') {
         const groupW = (W / n) * 0.7
         const bw = groupW / series.length
-        const mat = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.15, roughness: 0.45, metalness: 0.1 })
         vals.forEach((v, i) => {
           if (!fin(v)) return
+          // um material por barra: a barra destacada brilha sozinha, não a série inteira
+          const mat = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.15, roughness: 0.45, metalness: 0.1 })
           const ext = barExtent(v)
           const x = cx(i) - groupW / 2 + (k + 0.5) * bw
           const g = group(x, sc.zeroY)
