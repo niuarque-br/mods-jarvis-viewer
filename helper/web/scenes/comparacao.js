@@ -1,7 +1,7 @@
 // Cena «comparacao»: duas colunas com título, itens alinhados por índice. `value` numérico vira uma barra
 // comparável entre os lados (mesma escala, partindo do zero); texto aparece como legenda do item.
 // Não importa three: usa stage.THREE, então as funções puras abaixo rodam em `node --test`.
-import { formatValue } from './grafico.js'
+import { formatValue, chartScale, valueDigits } from './grafico.js'
 
 const COLORS = [0xD97757, 0x5B8DEF]
 const COL_X = 3.5
@@ -45,6 +45,18 @@ export function sharedScale(sides) {
   return m
 }
 
+// Casas decimais dos valores, derivadas da mesma escala compartilhada do gráfico (0,004 não pode virar "0").
+export function sideDigits(sides) {
+  const vals = []
+  for (const s of Array.isArray(sides) ? sides : []) for (const it of itemsOf(s)) if (it && fin(it.value)) vals.push(it.value)
+  return valueDigits(chartScale(vals).ticks)
+}
+
+// Texto do valor de um item (número formatado com as casas da escala; texto fica como veio).
+export function valueText(v, digits) {
+  return v === undefined || v === null ? undefined : fin(v) ? formatValue(v, '', digits) : String(v)
+}
+
 // Barra na largura `w`: parte do zero. Com negativos o zero fica no meio (cada metade vale `scale`).
 export function barSpan(v, scale, hasNeg, w) {
   const x0 = hasNeg ? 0 : -w / 2
@@ -58,6 +70,7 @@ export function build(scene, stage) {
   const sides = (Array.isArray(scene.sides) ? scene.sides : []).slice(0, 2).map((s) => (s && typeof s === 'object' ? s : {}))
   const scale = sharedScale(sides)
   const hasNeg = sides.some((s) => itemsOf(s).some((it) => it && fin(it.value) && it.value < 0))
+  const digits = sideDigits(sides)
   const rows = Math.max(0, ...sides.map((s) => itemsOf(s).length))
 
   const pieces = new Map()
@@ -96,7 +109,7 @@ export function build(scene, stage) {
         meshes.push(bar)
         anims.push((p) => { bar.scale.x = Math.max(sp.len * ease(p), 1e-4) })
       }
-      const sub = it.value === undefined || it.value === null ? undefined : fin(it.value) ? formatValue(it.value, '') : String(it.value)
+      const sub = valueText(it.value, digits)
       stage.addPiece(String(it.id), g, { label: it.label ?? it.id, sub, detail: it.detail, color })
       pieces.set(String(it.id), g)
       locked.push(g)
