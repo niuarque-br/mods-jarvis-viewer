@@ -4,10 +4,12 @@ import { chooseNarrator } from './narration'
 import type { Scene } from './scene'
 
 export const SAY_TIMEOUT_MS = 30000
+/** How long the page may take to answer step-done once the Jarvis said the sentence. */
+export const STEP_DONE_TIMEOUT_MS = 30000
 export const FALLBACK_CAPTION = 'narrando pela página'
 
 export type SayOutcome = 'done' | 'stopped' | 'timeout'
-export type NarrateOutcome = 'ended' | 'stopped' | 'fallback' | 'cancelled'
+export type NarrateOutcome = 'ended' | 'stopped' | 'fallback' | 'cancelled' | 'lost'
 
 /** The part of JarvisLink the narration loop uses (a fake in tests). */
 export type Link = {
@@ -15,14 +17,19 @@ export type Link = {
   say(text: string, timeoutMs?: number): Promise<SayOutcome>
   setPlaying(on: boolean): Promise<void>
   abandon?(): void
+  /** Writes `say = null`: the Jarvis drops the sentence it still holds for this scene. */
+  clearSay?(): Promise<void>
 }
 
 /** The viewer's side of the channel with the Jarvis. */
 export type JarvisLink = Link & {
   /** What the Jarvis wrote under `said`; answers only a request still waiting. */
   heard(value: unknown): void
-  /** Drops every request still waiting (the loop that asked has ended). */
+  /** What the Jarvis wrote under `mode`: anything but 'on' falls back at once. */
+  modeChanged(value: unknown): void
+  /** Drops every request still waiting: the loop falls back at once (the Jarvis went off, or the loop ended). */
   abandon(): void
+  clearSay(): Promise<void>
 }
 
 /**
@@ -31,8 +38,14 @@ export type JarvisLink = Link & {
  */
 export function jarvisLink($: EngineInterface): JarvisLink {
   const pending = new Map<string, (outcome: SayOutcome) => void>()
+  // The latest mode seen by the hook; it may land between an isOn() and the next say().
+  let mode: unknown
+  const abandon = () => {
+    for (const finish of [...pending.values()]) finish('timeout')
+  }
   return {
     async isOn() {
+      if (mode !== undefined) return mode === 'on'
       try {
         const read = await $.state.get({ plugin: 'modo-conversa', key: 'mode' } as const)
         return read.value === 'on'
@@ -41,6 +54,7 @@ export function jarvisLink($: EngineInterface): JarvisLink {
       }
     },
     say(text, timeoutMs = SAY_TIMEOUT_MS) {
+      if (mode !== undefined && mode !== 'on') return Promise.resolve('timeout')
       const id = crypto.randomUUID()
       return new Promise<SayOutcome>(resolve => {
         let timer: { cancel(): void } | undefined
@@ -63,15 +77,24 @@ export function jarvisLink($: EngineInterface): JarvisLink {
         // best-effort: the Jarvis only reads it to know a scene is playing
       }
     },
+    async clearSay() {
+      try {
+        await $.state.set({ plugin: 'jarvis-viewer', key: 'say' } as const, null)
+      } catch {
+        // best-effort: playing false tells the Jarvis the same
+      }
+    },
     heard(value) {
       const said = value as { id?: unknown; outcome?: unknown } | null | undefined
       if (!said || typeof said !== 'object' || typeof said.id !== 'string') return
       if (said.outcome !== 'done' && said.outcome !== 'stopped') return
       pending.get(said.id)?.(said.outcome)
     },
-    abandon() {
-      for (const finish of [...pending.values()]) finish('timeout')
+    modeChanged(value) {
+      mode = value
+      if (value !== 'on') abandon()
     },
+    abandon,
   }
 }
 
@@ -100,6 +123,8 @@ export type NarrateOptions = {
   localNarration?: () => Promise<boolean>
   /** Told the narrator the page got when the loop fell back. */
   onFallback?: (narrator: 'page' | 'caption') => void
+  /** A timer (STEP_DONE_TIMEOUT_MS) for the page's step-done; when it fires the loop ends ('lost'). */
+  stepDoneTimer?: () => { done: Promise<void>; cancel(): void }
 }
 
 type Send = (cmd: Record<string, unknown>) => Promise<void>
@@ -128,9 +153,7 @@ export async function narrateWithJarvis(
     }
     const narrator = chooseNarrator(false, narration) as 'page' | 'caption'
     options.onFallback?.(narrator)
-    const mode: Record<string, unknown> = { type: 'mode', narrator, narration }
-    if (step < steps.length) mode.from = step
-    await send(mode)
+    await send({ type: 'mode', narrator, narration, from: step })
     await send({ type: 'caption', text: FALLBACK_CAPTION })
     return 'fallback'
   }
@@ -152,13 +175,20 @@ export async function narrateWithJarvis(
         await send({ type: 'pause' })
         return 'stopped'
       }
-      if (said === 'timeout') return await fallback(i + 1)
-      const seen = await Promise.race([shown.then(() => 'shown' as const), cancel.done])
+      // Step i was animated but not heard: the page narrates from it (Review Focus #3).
+      if (said === 'timeout') return await fallback(i)
+      const timer = options.stepDoneTimer?.()
+      const waits: Promise<'shown' | 'cancelled' | 'lost'>[] = [shown.then(() => 'shown' as const), cancel.done]
+      if (timer) waits.push(timer.done.then(() => 'lost' as const))
+      const seen = await Promise.race(waits)
+      timer?.cancel()
       if (seen === 'cancelled') return 'cancelled'
+      if (seen === 'lost') return 'lost'
     }
     return 'ended'
   } finally {
     link.abandon?.()
+    await link.clearSay?.()
     await link.setPlaying(false)
   }
 }

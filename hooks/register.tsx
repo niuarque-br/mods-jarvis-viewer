@@ -3,7 +3,7 @@ import type { PluginOptions, Register } from 'claude-code'
 import { guidance, viewerPrompt } from './guidance'
 import { startHelper } from './helper'
 import type { HelperHandle } from './helper'
-import { Cancel, jarvisLink, narrateWithJarvis } from './jarvis'
+import { Cancel, STEP_DONE_TIMEOUT_MS, jarvisLink, narrateWithJarvis } from './jarvis'
 import type { JarvisLink } from './jarvis'
 import type { Narrator } from './narration'
 import { NARRATION_KEY, chooseNarrator, narrationOn } from './narration'
@@ -129,6 +129,13 @@ export const register: Register = (on, options: PluginOptions) => {
     return result
   })
 
+  // The Jarvis went off: a sentence it was asked for will never be said, so fall back now, not in 30 s.
+  on('state.set', { plugin: 'modo-conversa', key: 'mode' }, async ($, e, next) => {
+    const result = await next(e)
+    link?.modeChanged(e.value)
+    return result
+  })
+
   on('tool.call', { tool: TOOL }, async ($, e) => {
     const surfaces = await $.session.surfaces()
     if (surfaces.length > 0 && !surfaces.includes('desktop')) {
@@ -245,6 +252,14 @@ async function startLoop($: EngineOf, options: PluginOptions | undefined, helper
       onFallback: narrator => {
         if (lastScene?.id === id) sceneNarrator = narrator
       },
+      stepDoneTimer: () => {
+        let fire = () => {}
+        const done = new Promise<void>(resolve => {
+          fire = resolve
+        })
+        const t = $.clock.after(STEP_DONE_TIMEOUT_MS, () => fire())
+        return { done, cancel: () => t.cancel() }
+      },
     },
   ).catch(() => 'error' as const)
   loopDone = run
@@ -304,8 +319,15 @@ function launch($: Parameters<typeof startHelper>[0], options: PluginOptions | u
         }
         if (event.type === 'page-open') {
           // A page that (re)opens shows the scene from step 1, waiting for ▶ when the Jarvis narrates.
+          // A loop still running belongs to the page before the reload: its step-done will never come,
+          // so it ends here (playing false) and the user's ▶ (resume) starts a new one.
           if (mine && pendingStart) startPending($, options, mine)
           else if (loop) void stopLoop()
+          return
+        }
+        if (event.type === 'page-closed') {
+          // Nobody is watching: end the loop so playing goes false and the Jarvis lets go of the scene.
+          void stopLoop()
           return
         }
         if (event.type === 'step-done') {

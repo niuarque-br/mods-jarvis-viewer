@@ -14,23 +14,32 @@ import type { World } from './testkit'
 const jarvis: any = {
   name: 'modo-conversa',
   register(on: any) {
-    let cfg: { replies: (string | null)[]; offAt: number; delay: number } = { replies: [], offAt: -1, delay: 100 }
+    let cfg: { replies: (string | null)[]; offAt: number; offAfter: number; delay: number } = { replies: [], offAt: -1, offAfter: -1, delay: 100 }
     let n = 0
     on('command.run', { command: 'jarvis-sim' }, async ($: any, e: any) => {
       const c = JSON.parse(e.args)
-      cfg = { replies: c.replies ?? [], offAt: c.offAt ?? -1, delay: c.delay ?? 100 }
+      cfg = { replies: c.replies ?? [], offAt: c.offAt ?? -1, offAfter: c.offAfter ?? -1, delay: c.delay ?? 100 }
       await $.state.set({ plugin: 'modo-conversa', key: 'mode' }, c.mode)
       return { text: 'ok' }
     })
     on('state.set', { plugin: 'jarvis-viewer', key: 'say' }, async ($: any, e: any, next: any) => {
       const r = await next(e)
       const v = e.value
+      if (!v) await $.fs.write('jarvis-sim.log', JSON.stringify({ cleared: true }))
       if (v) {
         const i = n++
         await $.fs.write('jarvis-sim.log', JSON.stringify({ say: v.text }))
-        if (i === cfg.offAt) await $.state.set({ plugin: 'modo-conversa', key: 'mode' }, 'off')
+        // offAt: goes off mid-sentence (from its own timer: a write made inside this hook would be
+        // nested in the viewer's own say write, whose hooks the engine does not run again);
+        // offAfter: says the sentence, then goes off
+        if (i === cfg.offAt) $.clock.after(10, () => void $.state.set({ plugin: 'modo-conversa', key: 'mode' }, 'off'))
         const out = i < cfg.replies.length ? cfg.replies[i] : 'done'
-        if (out) $.clock.after(cfg.delay, () => void $.state.set({ plugin: 'modo-conversa', key: 'said' }, { id: v.id, outcome: out }))
+        const off = i === cfg.offAfter
+        if (out)
+          $.clock.after(cfg.delay, async () => {
+            await $.state.set({ plugin: 'modo-conversa', key: 'said' }, { id: v.id, outcome: out })
+            if (off) await $.state.set({ plugin: 'modo-conversa', key: 'mode' }, 'off')
+          })
       }
       return r
     })
@@ -41,16 +50,21 @@ const jarvis: any = {
   },
 }
 
-type Log = { says: string[]; playing: boolean[] }
-type Sim = { mode: 'on' | 'off'; replies?: ('done' | 'stopped' | null)[]; offAt?: number }
+/** says: texts asked; last: the last `say` written (text, or null once cleared). */
+type Log = { says: string[]; playing: boolean[]; last: string | null | undefined }
+type Sim = { mode: 'on' | 'off'; replies?: ('done' | 'stopped' | null)[]; offAt?: number; offAfter?: number }
 
 /** Configures the simulated Jarvis and collects what it heard. */
 async function jarvisSim($: any, on: any, sim: Sim): Promise<Log> {
-  const log: Log = { says: [], playing: [] }
+  const log: Log = { says: [], playing: [], last: undefined }
   on('fs.write', async (_: any, e: any) => {
     if (String(e.path).endsWith('jarvis-sim.log')) {
       const m = JSON.parse(e.text)
-      if ('say' in m) log.says.push(m.say)
+      if ('say' in m) {
+        log.says.push(m.say)
+        log.last = m.say
+      }
+      if ('cleared' in m) log.last = null
       if ('playing' in m) log.playing.push(m.playing)
     }
     return { value: undefined }
@@ -95,19 +109,19 @@ test('stopped pausa a cena', { plugins: [jarvis] }, async ($, on) => {
   expect(calls.cmds.at(-1)).toEqual({ type: 'pause' })
   expect(ctl.says).toEqual(['Um.', 'Dois.'])
   expect(ctl.playing).toEqual([true, false])
+  expect(ctl.last).toBeNull()
 })
 
 test('Jarvis desliga no meio → página assume do passo seguinte', { plugins: [jarvis] }, async ($, on) => {
   const clock = mock.clock(on)
   const calls = world(on, { pages: 1, onCmd: page })
-  const ctl = await jarvisSim($, on, { mode: 'on', offAt: 1 })
+  const ctl = await jarvisSim($, on, { mode: 'on', offAfter: 1 })
   await show($)
   await clock.advance(1000)
-  expect(advances(calls)).toEqual([0, 1])
   expect(calls.cmds).toContainEqual({ type: 'mode', narrator: 'page', narration: true, from: 2 })
   expect(calls.cmds.at(-1)).toEqual(FALLBACK)
-  expect(ctl.says).toEqual(['Um.', 'Dois.'])
   expect(ctl.playing).toEqual([true, false])
+  expect(ctl.last).toBeNull()
 })
 
 test('sem resposta em 30 s → fallback', { plugins: [jarvis] }, async ($, on) => {
@@ -119,9 +133,11 @@ test('sem resposta em 30 s → fallback', { plugins: [jarvis] }, async ($, on) =
   expect(calls.cmds.some(c => c.type === 'mode')).toBe(false)
   await clock.advance(1)
   expect(advances(calls)).toEqual([0])
-  expect(calls.cmds).toContainEqual({ type: 'mode', narrator: 'page', narration: true, from: 1 })
+  // step 0 was animated but never heard: the page narrates it again
+  expect(calls.cmds).toContainEqual({ type: 'mode', narrator: 'page', narration: true, from: 0 })
   expect(calls.cmds.at(-1)).toEqual(FALLBACK)
   expect(ctl.playing).toEqual([true, false])
+  expect(ctl.last).toBeNull()
 })
 
 test('fallback usa a narração salva: legenda vira caption', { plugins: [jarvis] }, async ($, on) => {
@@ -130,7 +146,7 @@ test('fallback usa a narração salva: legenda vira caption', { plugins: [jarvis
   const ctl = await jarvisSim($, on, { mode: 'on', replies: [null] })
   await show($)
   await clock.advance(30000)
-  expect(calls.cmds).toContainEqual({ type: 'mode', narrator: 'caption', narration: false, from: 1 })
+  expect(calls.cmds).toContainEqual({ type: 'mode', narrator: 'caption', narration: false, from: 0 })
   expect(ctl.playing).toEqual([true, false])
 })
 
@@ -179,6 +195,7 @@ test('⏸ na página durante a narração do Jarvis encerra o laço e libera o r
   expect(advances(calls)).toEqual([0])
   expect(ctl.says).toEqual(['Um.'])
   expect(ctl.playing).toEqual([true, false])
+  expect(ctl.last).toBeNull()
 })
 
 test('▶ depois de pausar retoma do passo pausado', { plugins: [jarvis] }, async ($, on) => {
@@ -272,4 +289,60 @@ test('com o Jarvis ligado, o interruptor de narração manda mode jarvis', { plu
   calls.emit({ type: 'narration', on: false })
   await clock.settle()
   expect(calls.cmds.at(-1)).toEqual({ type: 'mode', narrator: 'jarvis', narration: false })
+})
+
+test('sem resposta no último passo → página assume dele, sem recomeçar a cena', { plugins: [jarvis] }, async ($, on) => {
+  const clock = mock.clock(on)
+  const calls = world(on, { pages: 1, onCmd: page })
+  const ctl = await jarvisSim($, on, { mode: 'on', replies: ['done', 'done', null] })
+  await show($)
+  await clock.advance(1000)
+  expect(advances(calls)).toEqual([0, 1, 2])
+  await clock.advance(30000)
+  expect(calls.cmds).toContainEqual({ type: 'mode', narrator: 'page', narration: true, from: 2 })
+  expect(calls.cmds.at(-1)).toEqual(FALLBACK)
+  expect(ctl.playing).toEqual([true, false])
+  expect(ctl.last).toBeNull()
+})
+
+test('Jarvis desliga no meio da frase e não responde → página assume na hora', { plugins: [jarvis] }, async ($, on) => {
+  const clock = mock.clock(on)
+  const calls = world(on, { pages: 1, onCmd: page })
+  const ctl = await jarvisSim($, on, { mode: 'on', offAt: 1, replies: ['done', null] })
+  await show($)
+  await clock.advance(1000)
+  expect(advances(calls)).toEqual([0, 1])
+  expect(calls.cmds).toContainEqual({ type: 'mode', narrator: 'page', narration: true, from: 1 })
+  expect(calls.cmds.at(-1)).toEqual(FALLBACK)
+  expect(ctl.playing).toEqual([true, false])
+  expect(ctl.last).toBeNull()
+})
+
+test('página fechada no meio da narração encerra o laço', { plugins: [jarvis] }, async ($, on) => {
+  const clock = mock.clock(on)
+  // a page that never answers step-done
+  const calls = world(on, { pages: 1 })
+  const ctl = await jarvisSim($, on, { mode: 'on' })
+  await show($)
+  await clock.advance(1000)
+  expect(ctl.playing).toEqual([true])
+  calls.emit({ type: 'page-closed' })
+  await clock.settle()
+  expect(advances(calls)).toEqual([0])
+  expect(ctl.playing).toEqual([true, false])
+  expect(ctl.last).toBeNull()
+})
+
+test('step-done que não chega em 30 s encerra o laço', { plugins: [jarvis] }, async ($, on) => {
+  const clock = mock.clock(on)
+  const calls = world(on, { pages: 1 })
+  const ctl = await jarvisSim($, on, { mode: 'on' })
+  await show($)
+  await clock.advance(1000)
+  expect(ctl.playing).toEqual([true])
+  await clock.advance(30000)
+  expect(advances(calls)).toEqual([0])
+  expect(ctl.playing).toEqual([true, false])
+  expect(ctl.last).toBeNull()
+  expect(calls.cmds.some(c => c.type === 'mode' || c.type === 'pause')).toBe(false)
 })
