@@ -48,5 +48,6 @@ test('/viewer registra e submete o prompt', async ($, on) => {
   expect(calls.submitted).toEqual(['Explique o cache mostrando no viewer.'])
   expect(r).toMatchObject({ text: 'Pedindo a cena ao Claude…' })
   await $.command.run(RUN)
+  await clock.settle()
   expect(calls.submitted[1]).toBe('Mostre no viewer a explicação anterior.')
 })

@@ -65,7 +65,9 @@ export const register: Register = (on, options: PluginOptions) => {
   })
 
   on('command.run', { command: 'viewer' }, async ($, e) => {
-    await $.prompt.submit({ text: viewerPrompt(e.args), asUser: true })
+    // The host refuses a submit made while this hook holds the turn, so it goes out from a timer.
+    const text = viewerPrompt(e.args)
+    $.clock.after(0, () => void $.prompt.submit({ text, asUser: true }))
     return { text: 'Pedindo a cena ao Claude…' }
   })
 
