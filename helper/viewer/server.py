@@ -11,7 +11,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable, TextIO
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from viewer.bus import Bus
 
@@ -83,8 +83,9 @@ def make_server(
 
         def _payload(self) -> dict:
             length = int(self.headers.get("Content-Length") or 0)
-            if length > MAX_BODY:
-                raise ValueError("corpo grande demais")
+            if length < 0 or length > MAX_BODY:
+                self.close_connection = True
+                raise ValueError("corpo inválido")
             raw = self.rfile.read(length) if length else b""
             data = json.loads(raw or b"{}")
             if not isinstance(data, dict):
@@ -103,10 +104,13 @@ def make_server(
                 return self._events()
             if path == "/state":
                 return self._json(200, {"pages": self.server.pages})
-            self._static("index.html" if path == "/" else path.lstrip("/"))
+            self._static("index.html" if path == "/" else unquote(path).lstrip("/"))
 
         def _static(self, name: str) -> None:
-            target = (web_root / name).resolve()
+            try:
+                target = (web_root / name).resolve()
+            except (OSError, ValueError):
+                return self._json(404, {"error": "arquivo"})
             if web_root not in target.parents or not target.is_file():
                 return self._json(404, {"error": "arquivo"})
             ctype = TYPES.get(target.suffix) or mimetypes.guess_type(target.name)[0] or "application/octet-stream"
@@ -135,7 +139,12 @@ def make_server(
                 for message in (srv.last_scene, srv.last_mode):
                     if message is not None:
                         q.put(message)
-            srv.emit({"type": "page-open"})
+                try:
+                    srv.emit({"type": "page-open"})
+                except BaseException:
+                    srv.bus.unsubscribe(q)
+                    srv.pages -= 1
+                    raise
             last_write = time.monotonic()
             try:
                 self.wfile.write(b": ok\n\n")
@@ -159,13 +168,13 @@ def make_server(
                 with srv.state_lock:
                     srv.bus.unsubscribe(q)
                     srv.pages -= 1
-                    last = srv.pages == 0
-                if last:
-                    srv.emit({"type": "page-closed"})
+                    if srv.pages == 0:
+                        srv.emit({"type": "page-closed"})
 
         def do_POST(self) -> None:
             path = urlparse(self.path).path
             if not self._authorized():
+                self.close_connection = True
                 return self._json(401, {"error": "token"})
             try:
                 route = {"/cmd": self._cmd, "/event": self._event}.get(path)

@@ -18,11 +18,15 @@ class Out(io.StringIO):
 
 @pytest.fixture
 def helper(tmp_path):
-    (tmp_path / "index.html").write_text("<title>Viewer</title>", encoding="utf-8")
-    (tmp_path / "app.js").write_text("export {}", encoding="utf-8")
+    web = tmp_path / "web"
+    web.mkdir()
+    (tmp_path / "secret.txt").write_text("segredo", encoding="utf-8")
+    (web / "index.html").write_text("<title>Viewer</title>", encoding="utf-8")
+    (web / "app.js").write_text("export {}", encoding="utf-8")
+    (web / "meu arquivo.js").write_text("ok", encoding="utf-8")
     out = Out()
     quits = []
-    server = make_server(0, TOKEN, out, web_dir=tmp_path, on_quit=lambda: quits.append(1))
+    server = make_server(0, TOKEN, out, web_dir=web, on_quit=lambda: quits.append(1))
     threading.Thread(target=server.serve_forever, daemon=True).start()
     yield server.server_address[1], out, quits
     server.shutdown()
@@ -108,8 +112,65 @@ def test_pagina_servida_com_token_na_query(helper):
 
 
 def test_estatico_nao_escapa(helper):
-    assert status(helper, "GET", "/../server.py?t=" + TOKEN, token=None) == 404
-    assert status(helper, "GET", "/%2e%2e/server.py?t=" + TOKEN, token=None) == 404
+    for form in ("/../secret.txt", "/%2e%2e/secret.txt", "/..%5csecret.txt", "/.." + chr(92) + "secret.txt", "/%2e%2e%5csecret.txt"):
+        code, raw = request(helper, "GET", form + "?t=" + TOKEN, token=None)
+        assert code == 404 and b"segredo" not in raw, form
+
+
+def test_estatico_com_espaco_codificado(helper):
+    code, raw = request(helper, "GET", "/meu%20arquivo.js?t=" + TOKEN, token=None)
+    assert (code, raw) == (200, b"ok")
+
+
+def raw_exchange(helper, payload):
+    import socket
+
+    s = socket.create_connection(("127.0.0.1", helper[0]), timeout=3)
+    s.sendall(payload)
+    data = b""
+    try:
+        while True:
+            chunk = s.recv(4096)
+            if not chunk:
+                break
+            data += chunk
+    except OSError:
+        pass
+    s.close()
+    return data
+
+
+def test_content_length_negativo(helper):
+    data = raw_exchange(helper, b"POST /cmd HTTP/1.1\r\nHost: x\r\nX-Viewer-Token: tok-123\r\nContent-Length: -5\r\n\r\n")
+    assert data.startswith(b"HTTP/1.1 400")
+
+
+def test_corpo_grande_demais_fecha_a_conexao(helper):
+    smuggled = b'POST /cmd HTTP/1.1\r\nX-Viewer-Token: tok-123\r\nContent-Length: 15\r\n\r\n{"type":"quit"}'
+    data = raw_exchange(helper, b"POST /cmd HTTP/1.1\r\nHost: x\r\nX-Viewer-Token: tok-123\r\nContent-Length: 2000000\r\n\r\n" + smuggled)
+    assert data.startswith(b"HTTP/1.1 400")
+    assert data.count(b"HTTP/1.1") == 1
+    assert helper[2] == []
+
+
+def test_401_com_corpo_fecha_a_conexao(helper):
+    smuggled = b'POST /cmd HTTP/1.1\r\nX-Viewer-Token: tok-123\r\nContent-Length: 15\r\n\r\n{"type":"quit"}'
+    data = raw_exchange(helper, b"POST /cmd HTTP/1.1\r\nHost: x\r\nContent-Length: %d\r\n\r\n" % len(smuggled) + smuggled)
+    assert data.startswith(b"HTTP/1.1 401")
+    assert data.count(b"HTTP/1.1") == 1
+    assert helper[2] == []
+
+
+def test_reconexao_rapida_termina_em_page_open(helper):
+    _, out, _ = helper
+    page = Page(helper)
+    for _ in range(60):
+        page.close()
+        page = Page(helper)
+        assert wait_for(lambda: get(helper, f"/state?t={TOKEN}")[1] == {"pages": 1})
+        time.sleep(0.05)
+        assert types(out)[-1] == "page-open"
+    page.close()
 
 
 def test_cmd_desconhecido(helper):
