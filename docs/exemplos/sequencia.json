@@ -1,0 +1,28 @@
+{
+  "title": "Do pedido à cena no viewer",
+  "type": "sequencia",
+  "actors": [
+    { "id": "voce", "label": "Você", "detail": "Quem pede a explicação." },
+    { "id": "claude", "label": "Claude", "detail": "Monta a cena e chama a ferramenta." },
+    { "id": "mod", "label": "Mod", "detail": "Valida a cena e a entrega ao auxiliar." },
+    { "id": "aux", "label": "Auxiliar", "detail": "Guarda a última cena e fala com a página." },
+    { "id": "pagina", "label": "Página", "detail": "Desenha a cena no navegador embutido." }
+  ],
+  "messages": [
+    { "id": "m1", "from": "voce", "to": "claude", "label": "pede uma explicação" },
+    { "id": "m2", "from": "claude", "to": "mod", "label": "ferramenta com a cena" },
+    { "id": "m3", "from": "mod", "to": "mod", "label": "valida a cena" },
+    { "id": "m4", "from": "mod", "to": "aux", "label": "envia a cena" },
+    { "id": "m5", "from": "aux", "to": "pagina", "label": "transmite pelo SSE" },
+    { "id": "m6", "from": "pagina", "to": "voce", "label": "mostra e narra" },
+    { "id": "m7", "from": "voce", "to": "pagina", "label": "clica numa peça" },
+    { "id": "m8", "from": "pagina", "to": "claude", "label": "pede mais detalhes" }
+  ],
+  "steps": [
+    { "focus": ["voce", "claude"], "highlight": ["m1"], "say": "Você pede uma explicação, e o Claude decide que um desenho ajuda mais do que texto." },
+    { "focus": ["claude", "mod"], "highlight": ["m2", "m3"], "say": "O Claude chama a ferramenta com a cena. O mod confere ids, limites e campos antes de aceitar." },
+    { "focus": ["mod", "aux", "pagina"], "highlight": ["m4", "m5"], "say": "A cena válida vai para o auxiliar, que a guarda e a transmite para a página aberta." },
+    { "focus": ["pagina", "voce"], "highlight": ["m6"], "say": "A página desenha a cena e a explica passo a passo, com legenda e voz." },
+    { "focus": ["voce", "pagina", "claude"], "highlight": ["m7", "m8"], "say": "Se você clica numa peça, a página avisa o Claude, que explica aquela parte com mais detalhe." }
+  ]
+}

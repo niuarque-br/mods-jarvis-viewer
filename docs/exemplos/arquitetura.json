@@ -1,0 +1,25 @@
+{
+  "title": "Como o Modo Jarvis funciona",
+  "type": "arquitetura",
+  "nodes": [
+    { "id": "claude", "label": "Claude Code", "sub": "mod (register.tsx)", "shape": "caixa", "detail": "O mod recebe o texto e o envia como se você tivesse digitado." },
+    { "id": "aux", "label": "Auxiliar", "sub": "conversa-helper.exe", "shape": "octaedro", "detail": "Programa pequeno que roda só na sua máquina." },
+    { "id": "win", "label": "Janelinha", "sub": "Edge --app · orbe", "shape": "orbe", "detail": "Ouve o microfone e toca a voz." },
+    { "id": "you", "label": "Você", "sub": "microfone e fone", "shape": "pessoa" }
+  ],
+  "links": [
+    { "from": "you", "to": "win" },
+    { "from": "win", "to": "aux" },
+    { "from": "aux", "to": "claude" },
+    { "from": "claude", "to": "aux" },
+    { "from": "aux", "to": "win" },
+    { "from": "win", "to": "you" }
+  ],
+  "steps": [
+    { "focus": ["you"], "hops": [["you", "win"]], "say": "Você fala. A janelinha do Jarvis ouve o microfone e transforma a sua voz em texto." },
+    { "focus": ["aux"], "hops": [["win", "aux"]], "say": "Esse texto vai para o auxiliar, um programa pequeno que roda só na sua máquina." },
+    { "focus": ["claude"], "hops": [["aux", "claude"]], "say": "O auxiliar entrega o texto ao mod, e o mod envia como se você tivesse digitado o prompt." },
+    { "focus": ["aux"], "hops": [["claude", "aux"], ["claude", "aux"], ["claude", "aux"]], "say": "O Claude responde em frases. Cada frase volta para o auxiliar assim que fica pronta, sem esperar o resto." },
+    { "focus": ["win"], "hops": [["aux", "win"], ["win", "you"]], "say": "O auxiliar gera a voz, a janelinha toca, e a orbe acompanha. É assim que você ouve a resposta." }
+  ]
+}
