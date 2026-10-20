@@ -144,9 +144,7 @@ export function build(scene, stage) {
       const from = prev.length ? Math.max(...prev.map((i) => xs[i])) : xs[0]
       const to = carried.length ? Math.max(...carried.map((i) => xs[i])) : from
       if (!growing && own.length && my === token && Math.abs(to - from) > 0.01) {
-        await Promise.all([
-          stage.packet(new THREE.Vector3(from, 0, 0.1), new THREE.Vector3(to, 0, 0.1), { arc: 0, ms: PACKET_MS }),
-        ])
+        await stage.packet(new THREE.Vector3(from, 0, 0.1), new THREE.Vector3(to, 0, 0.1), { arc: 0, ms: PACKET_MS })
         return stage.wait(SETTLE_MS)
       }
       return stage.wait(growing ? GROW_MS + 300 : 700)

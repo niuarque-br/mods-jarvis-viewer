@@ -14,6 +14,7 @@ const HIGHLIGHT_MS = 900
 const EMPTY_MS = 600
 const LEGEND_GAP = 3.4
 const TWO_PI = Math.PI * 2
+const MAX_TICKS = 50
 
 export const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x)
 export const ease = (u) => 1 - Math.pow(1 - clamp01(u), 3)
@@ -43,6 +44,10 @@ export function niceTicks(min, max, count = 5, { zero = true } = {}) {
   const step = niceStep((hi - lo) / (n - 1))
   const k0 = Math.floor(lo / step + 1e-9)
   const k1 = Math.ceil(hi / step - 1e-9)
+  // entradas gigantes: passo não finito ou contagem enorme (o laço não avançaria / estouraria) -> só as pontas
+  if (!Number.isFinite(step) || !Number.isFinite(k0) || !Number.isFinite(k1) || k1 - k0 > MAX_TICKS || Math.max(Math.abs(k0), Math.abs(k1)) > 2 ** 50 || !Number.isFinite(hi - lo)) {
+    return [lo, hi].map((v) => (Number.isFinite(v) ? v : 0))
+  }
   const out = []
   for (let k = k0; k <= k1; k++) out.push(Number((k * step).toPrecision(12)) || 0)
   return out
@@ -83,10 +88,28 @@ export function donutAngles(values, start = 0) {
   })
 }
 
-export function formatValue(v, unit) {
-  const n = fin(v) ? v.toLocaleString('pt-BR', { maximumFractionDigits: 2 }).replace('-', '−') : '—'
+// Casas decimais que o passo das marcas pede (passo 0,001 -> 3), no máximo 6.
+export function tickDigits(ticks) {
+  const step = ticks && ticks.length > 1 ? Math.abs(ticks[1] - ticks[0]) : 1
+  if (!(step > 0) || !Number.isFinite(step)) return 0
+  return Math.min(6, Math.max(0, -Math.floor(Math.log10(step) + 1e-9)))
+}
+
+// `digits`: casas decimais mínimas (marcas de eixo: tickDigits; valores: tickDigits + 1, no mínimo 2).
+export function formatValue(v, unit, digits) {
+  const max = Number.isInteger(digits) ? Math.min(6, Math.max(0, digits)) : 2
+  const n = fin(v)
+    ? v.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: max }).replace('-', '−')
+    : '—'
   if (!unit) return n
   return unit === '%' ? n + '%' : n + ' ' + unit
+}
+export const valueDigits = (ticks) => Math.max(2, Math.min(6, tickDigits(ticks) + 1))
+
+// Conjunto de foco do passo: com algo em foco, os rótulos de eixo/categoria entram sempre (a escala não apaga). Vazio = sem foco.
+export function withAxis(lit, axisIds) {
+  if (!lit || !lit.size) return undefined
+  return [...new Set([...lit, ...(axisIds || [])])]
 }
 
 // "<serie>#<índice>" -> { series, index, id } ou null
@@ -128,10 +151,15 @@ export function build(scene, stage) {
   const lineMats = new Map() // id da série -> { mat, level, want }
   const explode = new Map() // "s#i" -> { group, base, dir, cur, want }
 
+  let td = 0 // casas das marcas do eixo Y
+  let tdx = 0 // casas das marcas do eixo X (dispersão)
+  let vd = 2 // casas dos valores destacados
+  const axisIds = [] // rótulos de eixo/categoria: ficam sempre acesos
   const group = (x, y, z = 0) => { const g = new THREE.Group(); g.position.set(x, y, z); return g }
   // rótulo HTML cujo topo do texto fica em y (o palco põe o texto ~1,2 abaixo de um grupo vazio)
   const textAt = (id, x, y, label, sub, color) => {
     const g = group(x, y + 1.2)
+    if (id.startsWith('__tick:') || id.startsWith('__cat:')) axisIds.push(id)
     stage.addPiece(id, g, { label, sub, color })
     return g
   }
@@ -167,12 +195,12 @@ export function build(scene, stage) {
     ids.known.add(id)
     return id
   }
-  const valueLabel = new Map() // "s#i" -> grupo do rótulo de valor (peça "valor:s#i")
+  const valueLabel = new Map() // "s#i" -> grupo do rótulo de valor (peça "__valor:s#i")
   const shownValue = new Set()
   const setValue = (id, on) => {
     const info = pointInfo.get(id)
     if (!info || !info.vl) return
-    const key = 'valor:' + id
+    const key = '__valor:' + id
     let g = valueLabel.get(id)
     if (!g) { g = group(info.vl.x, info.vl.y + 1.2); valueLabel.set(id, g) }
     stage.addPiece(key, g, on ? { label: info.vl.label, sub: info.vl.sub } : {}) // sem rótulo = tira o texto da tela
@@ -196,7 +224,7 @@ export function build(scene, stage) {
       const y = sc.toY(t)
       const zeroLine = t === 0
       hline(-W / 2, W / 2, y, zeroLine ? ink : stage.tubeColor, zeroLine ? 0.8 : 0.22)
-      textAt('tick:y' + k, x, y + 0.13, formatValue(t, ''))
+      textAt('__tick:y' + k, x, y + 0.13, formatValue(t, '', td))
     })
   }
 
@@ -206,11 +234,13 @@ export function build(scene, stage) {
     const all = series.flatMap(valuesOf)
     const sc = chartScale(all, H, { zero: chart === 'barras' })
     scaleInfo = sc
+    td = tickDigits(sc.ticks)
+    vd = valueDigits(sc.ticks)
     const n = Math.max(cats.length, ...series.map(nOf), 1)
     const cx = (i) => -W / 2 + ((i + 0.5) * W) / n
     yTicks(sc, -W / 2 - 0.65)
     vline(-W / 2, -H / 2, H / 2, ink, 0.5)
-    for (let i = 0; i < n; i++) textAt('cat:' + i, cx(i), -H / 2 - 0.6, catName(i))
+    for (let i = 0; i < n; i++) textAt('__cat:' + i, cx(i), -H / 2 - 0.6, catName(i))
     legend()
     expand(-W / 2 - 1.6, -H / 2 - 1.2, W / 2 + 1.2, H / 2 + 1.5)
 
@@ -238,9 +268,9 @@ export function build(scene, stage) {
           const vl = {
             x,
             y: ext.dir > 0 ? yEnd + 0.45 : yEnd - 0.12,
-            label: (sub ? sub + ': ' : '') + formatValue(v, unit),
+            label: (sub ? sub + ': ' : '') + formatValue(v, unit, vd),
           }
-          addPoint(sid, i, g, { detail: s.detail || `${catName(i)}: ${formatValue(v, unit)}`, color, vl, legend: sid, cat: 'cat:' + i })
+          addPoint(sid, i, g, { detail: s.detail || `${catName(i)}: ${formatValue(v, unit, vd)}`, color, vl, legend: sid, cat: '__cat:' + i })
           anims.push((p) => { mesh.scale.y = Math.max(hPx * ease(stagger(p, i, n)), 1e-4) })
         })
       } else {
@@ -262,8 +292,8 @@ export function build(scene, stage) {
           const d = disc(0.15, color)
           g.add(d)
           const v = vals[i]
-          const vl = { x: pt.x, y: pt.y + 0.5, label: (sub ? sub + ': ' : '') + formatValue(v, unit) }
-          addPoint(sid, i, g, { detail: s.detail || `${catName(i)}: ${formatValue(v, unit)}`, color, vl, legend: sid, cat: 'cat:' + i })
+          const vl = { x: pt.x, y: pt.y + 0.5, label: (sub ? sub + ': ' : '') + formatValue(v, unit, vd) }
+          addPoint(sid, i, g, { detail: s.detail || `${catName(i)}: ${formatValue(v, unit, vd)}`, color, vl, legend: sid, cat: '__cat:' + i })
           anims.push((p) => {
             const lp = ease(p)
             d.scale.setScalar(Math.max(clamp01((lp * (valid.length - 1) - order) * 3 + 1), 1e-4))
@@ -282,12 +312,15 @@ export function build(scene, stage) {
     const sx = chartScale(xs, W, { zero: false })
     const toX = (x) => sx.toY(x) // mesma escala, só que na largura (de -W/2 a W/2)
     scaleInfo = sy
+    td = tickDigits(sy.ticks)
+    vd = valueDigits(sy.ticks)
+    tdx = tickDigits(sx.ticks)
     yTicks(sy, -W / 2 - 0.65)
     vline(-W / 2, -H / 2, H / 2, ink, 0.5)
     sx.ticks.forEach((t, k) => {
       const x = toX(t)
       vline(x, -H / 2, H / 2, stage.tubeColor, 0.22)
-      textAt('tick:x' + k, x, -H / 2 - 0.3, formatValue(t, ''))
+      textAt('__tick:x' + k, x, -H / 2 - 0.3, formatValue(t, '', tdx))
     })
     legend()
     expand(-W / 2 - 1.6, -H / 2 - 1.2, W / 2 + 1.2, H / 2 + 1.5)
@@ -306,8 +339,8 @@ export function build(scene, stage) {
         const vl = {
           x: toX(pt.x),
           y: sy.toY(pt.y) + 0.5 + 0.3,
-          label: (pt.label ? pt.label + ': ' : '') + formatValue(pt.y, unit),
-          sub: 'x = ' + formatValue(pt.x, ''),
+          label: (pt.label ? pt.label + ': ' : '') + formatValue(pt.y, unit, vd),
+          sub: 'x = ' + formatValue(pt.x, '', tdx),
         }
         addPoint(sid, i, g, { detail: s.detail || pt.label, color, vl, legend: sid })
         anims.push((p) => d.scale.setScalar(Math.max(ease(stagger(p, order, total)), 1e-4)))
@@ -353,10 +386,10 @@ export function build(scene, stage) {
         const vl = {
           x: cxD + dir.x * (r1 + 0.7),
           y: dir.y * (r1 + 0.7) + 0.2,
-          label: formatValue(v, unit),
+          label: formatValue(v, unit, vd),
           sub: sub ? sub + ' · ' + catName(i) : catName(i),
         }
-        const id = addPoint(sid, i, g, { detail: s.detail || `${catName(i)}: ${formatValue(v, unit)}`, color, vl, legend: undefined, cat: 'cat:' + i })
+        const id = addPoint(sid, i, g, { detail: s.detail || `${catName(i)}: ${formatValue(v, unit, vd)}`, color, vl, legend: undefined, cat: '__cat:' + i })
         explode.set(id, { group: g, base, dir, cur: 0, want: 0 })
         let lastLen = -1
         anims.push((p) => {
@@ -380,11 +413,11 @@ export function build(scene, stage) {
       g.add(hitBox(0.6, 0.3))
       const neg = fin(first[i]) && first[i] < 0
       const pct = tot[i] && tot[i].frac > 0 ? ' ' + Math.round(tot[i].frac * 100) + '%' : ''
-      stage.addPiece('cat:' + i, g, { label: (neg ? '− ' : '') + catName(i), sub: pct.trim() || undefined, color: colorOf(i) })
-      pieces.set('cat:' + i, g)
+      stage.addPiece('__cat:' + i, g, { label: (neg ? '− ' : '') + catName(i), sub: pct.trim() || undefined, color: colorOf(i) })
+      pieces.set('__cat:' + i, g)
     }
     if (!anyData) {
-      textAt('vazio', cxD, 0.1, 'sem dados')
+      textAt('__vazio', cxD, 0.1, 'sem dados')
     }
     smooth.push(() => {
       for (const e of explode.values()) {
@@ -411,7 +444,7 @@ export function build(scene, stage) {
     pieces,
     scale: scaleInfo,
     async play(stepIndex, step) {
-      const my = ++token
+      ++token
       const focusSeries = (step && Array.isArray(step.focus) ? step.focus : []).map(String)
       const marks = (step && Array.isArray(step.highlight) ? step.highlight : []).map(parseRef).filter((r) => r && pointInfo.has(r.id))
       const lit = new Set()
@@ -428,19 +461,18 @@ export function build(scene, stage) {
         const info = pointInfo.get(r.id)
         hl.add(r.id)
         lit.add(r.id)
-        lit.add('valor:' + r.id)
+        lit.add('__valor:' + r.id)
         seriesLit.add(info.series)
         if (info.legend) lit.add(info.legend)
         if (info.cat) lit.add(info.cat)
       }
-      stage.focus(lit.size ? [...lit] : undefined)
+      stage.focus(withAxis(lit, axisIds))
       for (const [sid, lm] of lineMats) lm.want = !lit.size || seriesLit.has(sid) ? 0.9 : 0.2
       for (const [id, e] of explode) e.want = hl.has(id) ? 0.28 : 0
       for (const id of pointInfo.keys()) if (hl.has(id) !== shownValue.has(id)) setValue(id, hl.has(id))
 
       const growing = stepIndex === 0
       grow.start = growing ? stage.now() : -Infinity
-      if (my !== token) return
       await stage.wait(growing ? GROW_MS + SETTLE_MS : hl.size ? HIGHLIGHT_MS : EMPTY_MS)
     },
     dispose() {

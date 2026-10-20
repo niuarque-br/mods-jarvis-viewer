@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { niceTicks, chartScale, barBase, barExtent, donutAngles, formatValue, parseRef, stagger, RELIEF, CHART_H } from '../scenes/grafico.js'
+import { niceTicks, chartScale, barBase, barExtent, donutAngles, formatValue, tickDigits, valueDigits, withAxis, parseRef, stagger, RELIEF, CHART_H } from '../scenes/grafico.js'
 
 const finite = (a) => a.every(Number.isFinite)
 
@@ -108,4 +108,35 @@ test('parseRef e stagger', () => {
   assert.equal(stagger(1, 3, 4), 1)
   assert.ok(stagger(0.3, 0, 4) > stagger(0.3, 3, 4))
   assert.equal(stagger(0.5, 0, 1), 1)
+})
+
+test('niceTicks com entradas gigantes volta logo e sem NaN/Infinity', () => {
+  const t0 = Date.now()
+  const a = niceTicks(1e16, 1e16 + 2, 5, { zero: false })
+  const b = niceTicks(-1e308, 1e308)
+  const c = niceTicks(0, 1e308)
+  const d = niceTicks(0, 5e-324 * 3, 5, { zero: false })
+  assert.ok(Date.now() - t0 < 500)
+  for (const t of [a, b, c, d]) assert.ok(t.length >= 2 && t.length <= 51 && finite(t), String(t))
+})
+
+test('eixo pequeno (0,001 a 0,005) tem casas suficientes para não virar tudo 0', () => {
+  const sc = chartScale([0.001, 0.003, 0.005])
+  const td = tickDigits(sc.ticks)
+  assert.ok(td >= 3)
+  const labels = sc.ticks.map((t) => formatValue(t, '', td))
+  assert.equal(new Set(labels).size, labels.length)
+  assert.ok(labels.some((l) => l === '0,002'), labels.join('|'))
+  assert.ok(valueDigits(sc.ticks) >= 3)
+  assert.equal(formatValue(0.0034, '', valueDigits(sc.ticks)), '0,0034')
+  assert.equal(tickDigits([0, 5, 10]), 0)
+  assert.equal(valueDigits([0, 5, 10]), 2)
+  assert.equal(formatValue(12.345, 'x'), '12,35 x')
+  assert.ok(tickDigits([0, 1e-12]) <= 6)
+})
+
+test('withAxis: com foco os rótulos de eixo continuam acesos; sem foco, nada', () => {
+  assert.equal(withAxis(new Set(), ['__tick:y0']), undefined)
+  const l = withAxis(new Set(['s#1']), ['__tick:y0', '__cat:1', '__cat:1'])
+  assert.deepEqual(l.sort(), ['__cat:1', '__tick:y0', 's#1'])
 })
