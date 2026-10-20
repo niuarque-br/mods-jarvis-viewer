@@ -106,8 +106,7 @@ def test_rotas_exigem_token(helper):
 
 
 def test_pagina_servida_com_token_na_query(helper):
-    code, raw = request(helper, "GET", f"/?t={TOKEN}", token=None)
-    assert code == 200 and b"<title>Viewer</title>" in raw
+    assert request(helper, "GET", f"/?t={TOKEN}", token=None)[0] == 302  # redireciona para /TOKEN/
     assert request(helper, "GET", f"/app.js?t={TOKEN}", token=None)[0] == 200
 
 
@@ -254,3 +253,60 @@ def test_quit_chama_on_quit(helper):
     _, _, quits = helper
     assert post_cmd(helper, {"type": "quit"}) == 204
     assert wait_for(lambda: quits == [1])
+
+
+def raw_get(helper, path):
+    conn = http.client.HTTPConnection("127.0.0.1", helper[0], timeout=5)
+    conn.request("GET", path)
+    resp = conn.getresponse()
+    body = resp.read()
+    headers = dict(resp.getheaders())
+    conn.close()
+    return resp.status, headers, body
+
+
+def test_raiz_com_token_redireciona_para_prefixo(helper):
+    status_, headers, _ = raw_get(helper, f"/?t={TOKEN}")
+    assert status_ == 302
+    assert headers["Location"] == f"/{TOKEN}/"
+
+
+def test_raiz_sem_token_401(helper):
+    assert raw_get(helper, "/")[0] == 401
+
+
+def test_prefixo_serve_index_e_estaticos(helper):
+    status_, _, body = raw_get(helper, f"/{TOKEN}/")
+    assert (status_, body) == (200, b"<title>Viewer</title>")
+    assert raw_get(helper, f"/{TOKEN}/app.js")[2] == b"export {}"
+    assert raw_get(helper, f"/{TOKEN}/meu%20arquivo.js")[2] == b"ok"
+
+
+def test_prefixo_nao_escapa(helper):
+    assert raw_get(helper, f"/{TOKEN}/../secret.txt")[0] in (401, 404)
+    assert raw_get(helper, f"/{TOKEN}/%2e%2e/secret.txt")[0] == 404
+
+
+def test_prefixo_errado_401(helper):
+    assert raw_get(helper, "/outro/")[0] == 401
+    assert raw_get(helper, "/outro/app.js")[0] == 401
+    assert raw_get(helper, "/outro/events")[0] == 401
+
+
+def test_prefixo_favicon_204(helper):
+    assert raw_get(helper, f"/{TOKEN}/favicon.ico")[0] == 204
+
+
+def test_prefixo_events_e_event(helper):
+    conn = http.client.HTTPConnection("127.0.0.1", helper[0], timeout=5)
+    conn.request("GET", f"/{TOKEN}/events")
+    resp = conn.getresponse()
+    assert resp.status == 200
+    assert resp.getheader("Content-Type") == "text/event-stream"
+    conn2 = http.client.HTTPConnection("127.0.0.1", helper[0], timeout=5)
+    conn2.request("POST", f"/{TOKEN}/event", body=json.dumps({"type": "pick", "node": "a"}).encode(),
+                  headers={"Content-Type": "application/json"})
+    assert conn2.getresponse().status == 204
+    conn2.close()
+    conn.close()
+    assert {"type": "pick", "node": "a"} in helper[1].events()

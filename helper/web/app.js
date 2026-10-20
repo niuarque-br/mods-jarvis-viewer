@@ -1,10 +1,8 @@
 // Cola da página: SSE, controles, legenda e fala. A lógica de reprodução está em core.js (puro).
 // Conclusão de passo é por relógio (setTimeout/Promise), nunca por contagem de quadros (rAF para em aba de fundo).
-import { History, nextAction, stepMs, pickVoice } from '/core.js'
+import { History, nextAction, stepMs, pickVoice } from './core.js'
 
-const params = new URLSearchParams(location.search)
-const token = params.get('t') || '' // só em memória; vai nas URLs de /events e /event
-const q = '?t=' + encodeURIComponent(token)
+// O token vai no caminho (/TOKEN/): todas as URLs são relativas, sem token no código.
 const LOST_MS = 5000
 const SCENE_TYPE = /^[a-z]+$/
 const STEP_TIMEOUT_MS = 30000
@@ -21,6 +19,7 @@ let state = { narrator: 'page', total: 0, step: 0, playing: false, busy: false, 
 let current = null // { id, scene, mod, built }
 let runId = 0
 let narrationPref = true
+let liveNarrator = 'page' // narrador que o auxiliar mandou por último
 let loadSeq = 0
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -28,7 +27,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms))
 // ---------- rede ----------
 function post(event) {
   const body = JSON.stringify(current && event.scene === undefined ? { ...event, scene: current.id } : event)
-  fetch('/event' + q, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }).catch(() => {})
+  fetch('event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body }).catch(() => {})
 }
 
 // ---------- palco mínimo (a Tarefa 10 troca por engine/stage.js) ----------
@@ -131,7 +130,7 @@ async function load(item, event) {
   let mod
   try {
     if (!SCENE_TYPE.test(type)) throw new Error('tipo ausente')
-    mod = await import(`/scenes/${type}.js`)
+    mod = await import(`./scenes/${type}.js`)
   } catch {
     if (seq === loadSeq) showError(`Não conheço o tipo de cena «${type || '?'}».`)
     return
@@ -157,6 +156,7 @@ let reconnected = false
 function onScene(msg) {
   const same = current && msg.id === current.id
   const narrator = msg.narrator || state.narrator
+  liveNarrator = narrator
   if (same && reconnected) {
     // a página voltou a ouvir e o auxiliar reenviou a cena que já está na tela: recomeça no passo 1
     reconnected = false
@@ -174,16 +174,16 @@ function onCommand(msg) {
     case 'play': {
       const cur = history.current()
       if (cur && cur.id === msg.id && current) return apply({ type: 'scene', narrator: state.narrator, total: state.total, from: msg.from ?? 0 })
-      const found = history.items.findIndex((it) => it.id === msg.id)
-      if (found < 0) return
-      while (history.current().id !== msg.id) history.prev()
-      return load(history.current(), { type: 'scene', narrator: state.narrator, from: msg.from ?? 0 })
+      const item = history.goto(msg.id)
+      if (!item) return
+      return load(item, { type: 'scene', narrator: liveNarrator, from: msg.from ?? 0 })
     }
     case 'goto': return apply({ type: 'goto', step: msg.step })
     case 'advance': return apply({ type: 'advance', step: msg.step })
     case 'pause': return apply({ type: 'pause' })
     case 'mode': {
       if (typeof msg.narration === 'boolean') narrationPref = msg.narration
+      if (msg.narrator) liveNarrator = msg.narrator
       apply({ type: 'mode', narrator: msg.narrator })
       if (typeof msg.from === 'number') apply({ type: 'goto', step: msg.from })
       return
@@ -233,7 +233,11 @@ el.play.addEventListener('click', () => apply({ type: state.playing ? 'ui-pause'
 el.restart.addEventListener('click', () => apply({ type: 'restart' }))
 el.narr.addEventListener('change', () => { narrationPref = el.narr.checked; apply({ type: 'narration', on: el.narr.checked }) })
 function navigate(item) {
-  if (item) load(item, { type: 'scene', narrator: state.narrator, from: 0 })
+  if (!item) return
+  // Com o Jarvis narrando, uma cena antiga esperaria um advance que nunca vem: reabre com narração local, parada no passo 1.
+  const old = liveNarrator === 'jarvis' && history.hasNext()
+  const narrator = old ? (narrationPref ? 'page' : 'caption') : liveNarrator
+  load(item, { type: 'scene', narrator, from: 0, paused: old })
 }
 el.prev.addEventListener('click', () => navigate(history.prev()))
 el.next.addEventListener('click', () => navigate(history.next()))
@@ -244,7 +248,7 @@ let lostTimer = null
 let retryTimer = null
 function connect() {
   clearTimeout(retryTimer)
-  es = new EventSource('/events' + q)
+  es = new EventSource('events')
   es.onopen = () => {
     clearTimeout(lostTimer)
     lostTimer = null

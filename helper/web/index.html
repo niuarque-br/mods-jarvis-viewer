@@ -5,32 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <title>Jarvis Viewer</title>
-<script>
-  // Toda rota do auxiliar exige o token (?t=). Os módulos importam por caminho absoluto sem token,
-  // então o mapa de importação acrescenta o token a cada um. Cena nova = uma linha em SCENES.
-  (function () {
-    var t = new URLSearchParams(location.search).get('t') || ''
-    var q = '?t=' + encodeURIComponent(t)
-    var SCENES = ['arquitetura', 'fluxo', 'grafico', 'timeline', 'sequencia', 'estados', 'camadas', 'arvore', 'comparacao', 'metafora']
-    var FILES = ['/core.js', '/app.js', '/engine/stage.js', '/engine/layout.js', '/vendor/three.module.min.js']
-    SCENES.forEach(function (s) { FILES.push('/scenes/' + s + '.js') })
-    var imports = {}
-    FILES.forEach(function (f) { imports[f] = f + q })
-    imports['three'] = '/vendor/three.module.min.js' + q
-    var map = document.createElement('script')
-    map.type = 'importmap'
-    map.textContent = JSON.stringify({ imports: imports })
-    document.head.appendChild(map)
-    var css = document.createElement('link')
-    css.rel = 'stylesheet'
-    css.href = '/style.css' + q
-    document.head.appendChild(css)
-    var app = document.createElement('script')
-    app.type = 'module'
-    app.src = '/app.js' + q
-    document.head.appendChild(app)
-  })()
-</script>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
+<script type="module" src="app.js"></script>
 </head>
 <body>
 <div id="stage"></div>

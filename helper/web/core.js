@@ -13,9 +13,9 @@
 // }
 //
 // event.type:
-//   'scene'      {narrator, total, from?}   cena nova; começa a tocar de `from` (jarvis espera o advance)
+//   'scene'      {narrator, total, from?, paused?}   cena nova (paused: do histórico, espera o ▶); começa a tocar de `from` (jarvis espera o advance)
 //   'reconnect'  {total?}                   SSE voltou e o helper reenviou a cena: passo 1; pausada com jarvis
-//   'advance'    {step}                     comando do Jarvis: anima só esse passo
+//   'advance'    {step}                     comando do Jarvis: anima só esse passo (único que gera step-done com jarvis: state.requested)
 //   'goto'       {step}                     comando ou ponto de passo clicado
 //   'restart'                               botão ⟲
 //   'pause'                                 comando do helper: corta a fala e para (não posta nada)
@@ -67,6 +67,12 @@ export class History {
   hasNext() {
     return this.i >= 0 && this.i < this.items.length - 1
   }
+  goto(id) {
+    const i = this.items.findIndex((it) => it && it.id === id)
+    if (i < 0) return null
+    this.i = i
+    return this.items[i]
+  }
   next() {
     if (this.i < 0 || this.i >= this.items.length - 1) return null
     this.i++
@@ -78,7 +84,7 @@ const post = (event) => ({ type: 'post', event })
 const run = (step) => ({ type: 'run-step', step })
 
 function start(s, step, extra = {}) {
-  return { ...s, ...extra, step, busy: true, done: false, animDone: false, voiceDone: false }
+  return { ...s, requested: false, ...extra, step, busy: true, done: false, animDone: false, voiceDone: false }
 }
 
 // continua de onde parou: passo interrompido, ou o seguinte se já terminou; no fim, recomeça
@@ -96,18 +102,21 @@ export function nextAction(state, event) {
       const from = Math.min(Math.max(event.from ?? 0, 0), Math.max(total - 1, 0))
       const narrator = event.narrator || s.narrator
       const base = { ...s, narrator, total, step: from, busy: false, done: false }
-      if (narrator === 'jarvis') return { state: { ...base, playing: false }, actions: [] }
-      return { state: start(base, from, { playing: true }), actions: [run(from)] }
+      const cut = { type: 'stop-speech' }
+      // paused: cena aberta do histórico — narração local, parada até o ▶
+      if (narrator === 'jarvis' || event.paused) return { state: { ...base, playing: false }, actions: [cut] }
+      return { state: start(base, from, { playing: true }), actions: [cut, run(from)] }
     }
     case 'reconnect': {
       const total = event.total ?? s.total
       const base = { ...s, total, step: 0, busy: false, done: false }
-      if (s.narrator === 'jarvis') return { state: { ...base, playing: false }, actions: [] }
-      return { state: start(base, 0, { playing: true }), actions: [run(0)] }
+      const cut = { type: 'stop-speech' }
+      if (s.narrator === 'jarvis') return { state: { ...base, playing: false }, actions: [cut] }
+      return { state: start(base, 0, { playing: true }), actions: [cut, run(0)] }
     }
     case 'advance': {
       if (event.step < 0 || event.step >= s.total) return none
-      return { state: start(s, event.step, { playing: true }), actions: [run(event.step)] }
+      return { state: start(s, event.step, { playing: true, requested: true }), actions: [run(event.step)] }
     }
     case 'goto': {
       if (event.step < 0 || event.step >= s.total) return none
@@ -151,7 +160,8 @@ export function nextAction(state, event) {
       const n = { ...s, [event.type === 'anim-done' ? 'animDone' : 'voiceDone']: true }
       if (!(n.animDone && n.voiceDone)) return { state: n, actions: [] }
       const finished = { ...n, busy: false, done: true }
-      const actions = [post({ type: 'step-done', step: n.step })]
+      // com o Jarvis, só o passo que ele pediu (advance) é respondido
+      const actions = n.narrator === 'jarvis' && !n.requested ? [] : [post({ type: 'step-done', step: n.step })]
       if (n.narrator === 'jarvis' || !n.playing) return { state: finished, actions }
       if (n.step + 1 < n.total) {
         actions.push(run(n.step + 1))

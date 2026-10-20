@@ -11,7 +11,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable, TextIO
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from viewer.bus import Bus
 
@@ -63,6 +63,13 @@ def make_server(
         def log_message(self, *args: Any) -> None:
             pass
 
+        def _prefixed(self, path: str) -> str | None:
+            """'/TOKEN/resto' com o token certo -> '/resto'; senão None."""
+            first, sep, rest = path.lstrip("/").partition("/")
+            if not sep or not hmac.compare_digest(unquote(first).encode(), token.encode()):
+                return None
+            return "/" + rest
+
         def _authorized(self) -> bool:
             query = parse_qs(urlparse(self.path).query)
             given = self.headers.get("X-Viewer-Token") or (query.get("t") or [""])[0]
@@ -98,8 +105,21 @@ def make_server(
                 return self._json(200, {"app": "jarvis-viewer"})
             if path == "/favicon.ico":
                 return self._send(204)
-            if not self._authorized():
+            inner = self._prefixed(path)
+            if inner is not None:
+                path = inner
+            elif not self._authorized():
                 return self._json(401, {"error": "token"})
+            elif path == "/":
+                # página aberta com ?t=: muda para /TOKEN/ para que as URLs relativas carreguem sem token
+                self.send_response(302)
+                self.send_header("Location", f"/{quote(token, safe='')}/")
+                self.send_header("Content-Length", "0")
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                return
+            if path == "/favicon.ico":
+                return self._send(204)
             if path == "/events":
                 return self._events()
             if path == "/state":
@@ -173,7 +193,10 @@ def make_server(
 
         def do_POST(self) -> None:
             path = urlparse(self.path).path
-            if not self._authorized():
+            inner = self._prefixed(path)
+            if inner is not None:
+                path = inner
+            elif not self._authorized():
                 self.close_connection = True
                 return self._json(401, {"error": "token"})
             try:
