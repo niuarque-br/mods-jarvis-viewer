@@ -1,5 +1,7 @@
+export type SayRequest = { id: string; text: string }
+
 declare module 'claude-code' {
   interface PluginState {
-    'jarvis-viewer': { say: { id: string; text: string } | null; playing: boolean }
+    'jarvis-viewer': { say: SayRequest | null; playing: boolean }
   }
 }
