@@ -1,0 +1,20 @@
+{
+  "title": "Como o viewer nasceu",
+  "type": "timeline",
+  "events": [
+    { "id": "ideia", "date": "Jan", "label": "A ideia", "detail": "Explicar com cenas em vez de texto." },
+    { "id": "spike", "date": "Fev", "label": "Teste do navegador" },
+    { "id": "ajud", "date": "Mar", "label": "O auxiliar local" },
+    { "id": "motor", "date": "Abr", "label": "O motor 3D" },
+    { "id": "cenas", "date": "Mai", "label": "Os dez tipos de cena", "detail": "Diagramas, dados e metáfora." },
+    { "id": "voz", "date": "Jun", "label": "Narração" },
+    { "id": "jarvis", "date": "Jul", "label": "Integração com o Jarvis" },
+    { "id": "pub", "date": "Ago", "label": "Primeira versão" }
+  ],
+  "steps": [
+    { "say": "Esta é a história do viewer, da ideia à primeira versão." },
+    { "highlight": ["ajud"], "say": "Em março veio o auxiliar local, que serve a página e recebe as cenas." },
+    { "highlight": ["cenas"], "say": "Em maio chegaram os dez tipos de cena." },
+    { "focus": ["pub"], "say": "E em agosto saiu a primeira versão." }
+  ]
+}

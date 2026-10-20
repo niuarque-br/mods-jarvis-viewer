@@ -1,0 +1,15 @@
+{
+  "title": "Resultado do trimestre",
+  "type": "grafico",
+  "chart": "barras",
+  "unit": "mil R$",
+  "categories": ["Jan", "Fev", "Mar", "Abr", "Mai"],
+  "series": [
+    { "id": "res", "label": "Resultado", "values": [12, 18, -6, 9, 15], "detail": "Receita menos despesa, em mil R$." }
+  ],
+  "steps": [
+    { "say": "Este é o resultado de cinco meses. Todas as barras partem do zero." },
+    { "highlight": ["res#2"], "say": "Em março houve prejuízo: a barra desce abaixo do zero." },
+    { "highlight": ["res#1", "res#4"], "say": "Fevereiro e maio foram os melhores meses." }
+  ]
+}
