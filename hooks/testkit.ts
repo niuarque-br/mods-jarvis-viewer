@@ -27,6 +27,7 @@ export type WorldOptions = {
   port?: number
   pages?: number
   store?: Record<string, unknown>
+  storeFails?: ('get' | 'set')[]
   surfaces?: ('desktop' | 'terminal')[]
 }
 
@@ -108,8 +109,12 @@ export function world(on: On, opts: WorldOptions = {}): World {
     calls.origins.push(e.origin)
     return { text: e.text }
   })
-  on('store.get', async ($, e) => ({ value: calls.store.get(e.key) }))
+  on('store.get', async ($, e) => {
+    if (opts.storeFails?.includes('get')) throw new Error('store.get falhou')
+    return { value: calls.store.get(e.key) }
+  })
   on('store.set', async ($, e) => {
+    if (opts.storeFails?.includes('set')) throw new Error('store.set falhou')
     calls.store.set(e.key, e.value)
     return { value: undefined }
   })

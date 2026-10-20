@@ -11,8 +11,9 @@ export function chooseNarrator(jarvisOn: boolean, narrationOn: boolean): Narrato
 }
 
 /** The saved switch holds while the /config option is unchanged; a changed option wins. */
-export function narrationOn(option: string | undefined, saved: SavedNarration | undefined): boolean {
+export function narrationOn(option: string | undefined, saved: unknown): boolean {
   const current = option ?? 'ligada'
-  if (saved && saved.option === current) return saved.on
+  const s = saved as Partial<SavedNarration> | null | undefined
+  if (s && typeof s === 'object' && typeof s.on === 'boolean' && s.option === current) return s.on
   return current !== 'desligada'
 }

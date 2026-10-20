@@ -4,7 +4,6 @@ import { guidance, viewerPrompt } from './guidance'
 import { startHelper } from './helper'
 import type { HelperHandle } from './helper'
 import { NARRATION_KEY, chooseNarrator, narrationOn } from './narration'
-import type { SavedNarration } from './narration'
 import { LIMITS, SCENE_TYPES, validateScene } from './scene'
 import type { Scene } from './scene'
 
@@ -119,7 +118,12 @@ export const register: Register = (on, options: PluginOptions) => {
     // A replay on a helper that never saw the scene (it was respawned) sends the scene again.
     if (input.replay && lastHandle === helper) await helper.send({ type: 'play', id: sent.id, from })
     else {
-      const saved = (await $.store.get(NARRATION_KEY)) as SavedNarration | undefined
+      let saved: unknown
+      try {
+        saved = await $.store.get(NARRATION_KEY)
+      } catch {
+        saved = undefined
+      }
       const narrator = chooseNarrator(false, narrationOn(optionOf(options), saved))
       await helper.send({ type: 'scene', id: sent.id, scene: sent.scene, narrator, from })
     }
@@ -156,10 +160,20 @@ function launch($: Parameters<typeof startHelper>[0], options: PluginOptions | u
     try {
       const h = await startHelper($, event => {
         if (event.type === 'narration') {
+          const flag = event.on as unknown
+          if (typeof flag !== 'boolean') return
           void (async () => {
             const option = optionOf(options) ?? 'ligada'
-            await $.store.set(NARRATION_KEY, { on: event.on, option })
-            await mine?.send({ type: 'mode', narrator: chooseNarrator(false, event.on), narration: event.on })
+            try {
+              await $.store.set(NARRATION_KEY, { on: flag, option })
+            } catch {
+              // saving is best-effort; the page still gets the mode
+            }
+            try {
+              await mine?.send({ type: 'mode', narrator: chooseNarrator(false, flag), narration: flag })
+            } catch {
+              // helper gone; nothing to tell
+            }
           })()
           return
         }
