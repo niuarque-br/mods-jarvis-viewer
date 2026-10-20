@@ -1,0 +1,26 @@
+{
+  "title": "Como o viewer trata um pedido",
+  "type": "fluxo",
+  "nodes": [
+    { "id": "ini", "label": "Pedido", "kind": "inicio", "detail": "Você pede uma explicação visual." },
+    { "id": "val", "label": "Validar cena", "kind": "etapa", "detail": "O mod confere ids, limites e campos." },
+    { "id": "ok", "label": "Cena válida?", "kind": "decisao", "detail": "Só uma cena válida chega à página." },
+    { "id": "env", "label": "Enviar à página", "kind": "etapa", "detail": "O auxiliar guarda a cena e a transmite." },
+    { "id": "err", "label": "Devolver o erro", "kind": "etapa", "detail": "A ferramenta diz qual campo está errado." },
+    { "id": "fim", "label": "Cena exibida", "kind": "fim" }
+  ],
+  "edges": [
+    { "from": "ini", "to": "val" },
+    { "from": "val", "to": "ok" },
+    { "from": "ok", "to": "env", "label": "sim" },
+    { "from": "ok", "to": "err", "label": "não" },
+    { "from": "env", "to": "fim" },
+    { "from": "err", "to": "val", "label": "corrige" }
+  ],
+  "steps": [
+    { "focus": ["ini", "val"], "path": ["ini", "val"], "say": "O pedido chega e a primeira coisa é validar a cena montada pelo Claude." },
+    { "focus": ["val", "ok"], "path": ["val", "ok"], "say": "A validação confere ids repetidos, ids que não existem e os limites de passos e peças." },
+    { "focus": ["ok", "env", "fim"], "path": ["ok", "env", "fim"], "say": "Se a cena está válida, o auxiliar a transmite e a página passa a exibi-la." },
+    { "focus": ["ok", "err"], "path": ["ok", "err", "val"], "say": "Se não está, o Claude recebe o caminho do campo com problema, corrige e tenta de novo." }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "title": "Estados do Jarvis",
+  "type": "estados",
+  "states": [
+    { "id": "ocioso", "label": "Ocioso", "initial": true, "detail": "Esperando a palavra de ativação." },
+    { "id": "ouvindo", "label": "Ouvindo", "detail": "Captando a sua fala." },
+    { "id": "pensando", "label": "Pensando", "detail": "O Claude monta a resposta." },
+    { "id": "falando", "label": "Falando", "detail": "Lendo a resposta em voz alta." },
+    { "id": "erro", "label": "Erro", "detail": "Algo falhou; volta ao repouso." }
+  ],
+  "transitions": [
+    { "from": "ocioso", "to": "ouvindo", "label": "ativação" },
+    { "from": "ouvindo", "to": "pensando", "label": "fim da fala" },
+    { "from": "ouvindo", "to": "ouvindo", "label": "continua falando" },
+    { "from": "pensando", "to": "falando", "label": "resposta pronta" },
+    { "from": "pensando", "to": "erro", "label": "falha" },
+    { "from": "falando", "to": "ocioso", "label": "terminou" },
+    { "from": "erro", "to": "ocioso", "label": "reinicia" }
+  ],
+  "steps": [
+    { "focus": ["ocioso"], "say": "O Jarvis começa ocioso, só esperando a palavra de ativação." },
+    { "focus": ["ocioso", "ouvindo"], "path": ["ocioso", "ouvindo"], "say": "Ao ouvir a ativação, ele passa a ouvir você." },
+    { "focus": ["ouvindo"], "path": ["ouvindo", "ouvindo"], "say": "Enquanto você continua falando, ele permanece ouvindo." },
+    { "focus": ["ouvindo", "pensando", "falando"], "path": ["ouvindo", "pensando", "falando"], "say": "Quando você para, ele pensa, e a resposta pronta vira voz." },
+    { "focus": ["pensando", "erro", "ocioso"], "path": ["pensando", "erro", "ocioso"], "say": "Se algo falha no pensamento, ele vai para erro e reinicia no repouso." }
+  ]
+}

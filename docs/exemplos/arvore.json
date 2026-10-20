@@ -1,0 +1,22 @@
+{
+  "title": "Cenas do viewer",
+  "type": "arvore",
+  "nodes": [
+    { "id": "cenas", "label": "Cenas", "detail": "Os dez tipos de cena do viewer." },
+    { "id": "diag", "label": "Diagramas", "parent": "cenas" },
+    { "id": "dados", "label": "Dados", "parent": "cenas" },
+    { "id": "livre", "label": "Livre", "parent": "cenas" },
+    { "id": "arq", "label": "Arquitetura", "parent": "diag", "detail": "Nós e ligações." },
+    { "id": "flu", "label": "Fluxo", "parent": "diag", "detail": "Etapas e decisões." },
+    { "id": "est", "label": "Estados", "parent": "diag", "detail": "Máquina de estados." },
+    { "id": "gra", "label": "Gráfico", "parent": "dados", "detail": "Barras, linhas, rosca e dispersão." },
+    { "id": "tim", "label": "Timeline", "parent": "dados", "detail": "Marcos no tempo." },
+    { "id": "met", "label": "Metáfora", "parent": "livre", "detail": "Objetos e ações soltos." }
+  ],
+  "steps": [
+    { "focus": ["cenas"], "say": "Tudo parte das cenas: os ramos brotam daqui em três famílias." },
+    { "highlight": ["flu"], "say": "Fluxo está em Diagramas, ao lado de arquitetura e estados." },
+    { "highlight": ["gra", "tim"], "say": "Gráfico e timeline são as cenas de dados." },
+    { "highlight": ["met"], "say": "E a metáfora é a cena livre, para o que não cabe nas outras." }
+  ]
+}
