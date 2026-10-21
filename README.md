@@ -63,7 +63,7 @@ Depois abra uma sessão nova ou rode `/reload-plugins`.
 
 ## Usar
 
-- **Sob demanda**: digite `/viewer`, peça "mostra num desenho" ou, com o Jarvis ligado, diga isso em voz alta.
+- **Sob demanda**: clique em **🧊 Jarvis Viewer** acima do prompt, digite `/viewer`, peça "mostra num desenho" ou, com o Jarvis ligado, diga isso em voz alta.
 - **Claude escolhe**: o Claude abre o viewer sozinho quando um desenho ajuda. Respostas curtas e ajustes pontuais continuam só em texto.
 - Na tela: **▶** reproduz, **⟲** recomeça, e o interruptor **🔊 Narração / 💬 Legenda** troca o modo. Arraste para girar a cena.
 - Peça "de novo" ou "volta no passo 3" para rever a última cena.

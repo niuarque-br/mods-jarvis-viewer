@@ -92,6 +92,22 @@ export const register: Register = (on, options: PluginOptions) => {
     return { text: 'Pedindo a cena ao Claude…' }
   })
 
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    if (e.props.hasSurvey) return next(e)
+    const { Box, Button } = $.ui.resolve(e)
+    const below = await next(e)
+    const ask = () => {
+      const text = viewerPrompt('')
+      $.clock.after(0, () => void $.prompt.submit({ text, asUser: true }))
+    }
+    return (
+      <Box gap={1}>
+        <Button key="viewer" label="🧊 Jarvis Viewer" onPress={ask} />
+        {below}
+      </Box>
+    )
+  })
+
   on('prompt.compose', async ($, e, next) => {
     const composed = await next(e)
     const mode = String(options?.presentation ?? 'IA escolhe')
