@@ -36,7 +36,7 @@ export function normalizar(s: string): string {
   if (hit !== undefined) return hit
   const out = s
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/\p{M}/gu, '')
     .toLowerCase()
     .replace(/[\s_-]+/g, ' ')
     .trim()
