@@ -49,3 +49,43 @@ test('loadFigure: pedidos simultâneos da mesma chave dividem uma promessa', asy
   assert.equal(b, null)
   assert.equal(calls, 1)
 })
+
+// Navegador de mentira: imagem que carrega depois de `ms`
+function fakeBrowser(imgDelayMs) {
+  globalThis.fetch = async () => ({ ok: true, status: 200, text: async () => '<svg viewBox="0 0 1 1"><path stroke="currentColor"/></svg>' })
+  globalThis.Image = class { set src(_) { setTimeout(() => this.onload?.(), imgDelayMs) } get naturalWidth() { return 24 } get naturalHeight() { return 24 } }
+  globalThis.document = { createElement: () => ({ getContext: () => ({ drawImage() {} }) }) }
+  const made = []
+  class CanvasTexture { constructor() { this.disposed = 0; made.push(this) } dispose() { this.disposed++ } }
+  return { THREE: { CanvasTexture }, made }
+}
+
+test('loadFigure: imagem que chega depois do prazo não deixa textura órfã', async () => {
+  clearFigureCache()
+  const { THREE, made } = fakeBrowser(60)
+  const r = await loadFigure({ theme: 'dark', THREE }, 'lucide/line:lento', { cor: 1, timeoutMs: 10 })
+  assert.equal(r, null)
+  await new Promise((res) => setTimeout(res, 120))
+  assert.equal(made.length, 1)
+  assert.equal(made[0].disposed, 1)
+})
+
+test('clearFigureCache libera as texturas em cache', async () => {
+  clearFigureCache()
+  const { THREE, made } = fakeBrowser(1)
+  const tex = await loadFigure({ theme: 'dark', THREE }, 'lucide/line:rapido', { cor: 1 })
+  assert.equal(tex, made[0])
+  assert.equal(tex.disposed, 0)
+  clearFigureCache()
+  assert.equal(tex.disposed, 1)
+})
+
+test('clearFigureCache com carga em andamento: a imagem tardia é liberada', async () => {
+  clearFigureCache()
+  const { THREE, made } = fakeBrowser(40)
+  const p = loadFigure({ theme: 'dark', THREE }, 'lucide/line:meio', { cor: 1 })
+  clearFigureCache()
+  await p
+  await new Promise((res) => setTimeout(res, 20))
+  assert.equal(made[0].disposed, 1)
+})

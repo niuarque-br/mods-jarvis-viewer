@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import * as THREE from '../vendor/three.module.min.js'
-import { escolherForma, makePiece, makeShape } from '../engine/pieces.js'
+import { escolherForma, makePiece, makeShape, estadoDoNivel } from '../engine/pieces.js'
 import { clearFigureCache } from '../engine/figure.js'
 
 test('escolherForma: figura vence estilo.forma; estilo.forma vence padrão; padrão sem nada', () => {
@@ -52,11 +52,11 @@ test('makePiece: estilo.forma sem figura desenha a forma pedida, com contorno e 
   let loop = false
   obj.traverse((o) => { if (o.geometry?.type === 'OctahedronGeometry') oct = true; if (o.isLineLoop) loop = true })
   assert.ok(oct && loop)
-  obj.scale.setScalar(1.2) // foco
+  obj.userData.level = 1 // foco, como o stage escreve
   stage.tick()
   const inner = obj.children[0]
   assert.ok(inner.scale.x !== 1 && Math.abs(inner.scale.x - 1) <= 0.1)
-  assert.equal(obj.scale.x, 1.2) // o palco manda na escala externa
+  assert.equal(obj.scale.x, 1) // a escala externa é do palco
   obj.userData.dispose()
   assert.equal(stage.count(), 0)
 })
@@ -64,8 +64,44 @@ test('makePiece: estilo.forma sem figura desenha a forma pedida, com contorno e 
 test('makePiece: peça apagada fica neutra', async () => {
   const stage = fakeStage()
   const obj = await makePiece(stage, { movimento: 'girar' }, { padrao: 'caixa', cor: 0xffffff })
-  obj.scale.setScalar(0.9)
+  obj.userData.level = 0.12 // apagada
   stage.tick()
   assert.equal(obj.children[0].scale.x, 1)
   assert.equal(obj.children[0].rotation.y, 0)
+})
+
+test('estadoDoNivel: nível do stage vira estado do movimento', () => {
+  assert.equal(estadoDoNivel(1), 'foco')
+  assert.equal(estadoDoNivel(0.35), 'normal')
+  assert.equal(estadoDoNivel(0.12), 'apagada')
+  assert.equal(estadoDoNivel(undefined), 'normal')
+})
+
+test('makePiece: contorno acompanha a câmera em órbita (losango não vira de lado)', async () => {
+  const stage = fakeStage()
+  const obj = await makePiece(stage, {}, { padrao: 'caixa', cor: 0xffffff, contorno: 'losango' })
+  obj.position.set(2, 0, 0)
+  const loop = []
+  obj.traverse((o) => { if (o.isLineLoop) loop.push(o) })
+  for (const yaw of [0, 0.9, 2.2]) {
+    stage.camera.quaternion.setFromEuler(new THREE.Euler(0.2, yaw, 0))
+    obj.rotation.y = 0.7 // a cena pode girar o grupo externo
+    obj.updateMatrixWorld(true)
+    stage.tick()
+    obj.updateMatrixWorld(true)
+    const wq = loop[0].getWorldQuaternion(new THREE.Quaternion())
+    assert.ok(Math.abs(wq.dot(stage.camera.quaternion)) > 0.9999)
+  }
+})
+
+test('makePiece: malhas opacas da forma não viram transparentes sem motivo', async () => {
+  const stage = fakeStage()
+  const obj = await makePiece(stage, { movimento: 'piscar' }, { padrao: 'caixa', cor: 0xffffff })
+  let mat
+  obj.traverse((o) => { if (o.isMesh) mat = o.material })
+  obj.userData.level = 0.12 // apagada: opacidade 1
+  stage.tick()
+  assert.equal(mat.transparent, false)
+  obj.userData.level = 1
+  for (let i = 0; i < 1; i++) stage.tick()
 })

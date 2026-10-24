@@ -48,11 +48,19 @@ function sizeSvg(texto, px) {
 }
 
 const cache = new Map() // nome|cor → Promise<Texture | null>
-export function clearFigureCache() { cache.clear() }
+const live = new Set() // texturas entregues e ainda em cache
+let generation = 0
+// Esvazia o cache e libera as texturas; imagem que chegar depois (timeout, troca de palco) é liberada ao chegar.
+export function clearFigureCache() {
+  generation++
+  cache.clear()
+  for (const t of live) t.dispose?.()
+  live.clear()
+}
 
-function withTimeout(promise, ms) {
+function withTimeout(promise, ms, onTimeout) {
   return new Promise((resolve) => {
-    const id = setTimeout(() => resolve(null), ms)
+    const id = setTimeout(() => { onTimeout?.(); resolve(null) }, ms)
     promise.then((v) => { clearTimeout(id); resolve(v) }, () => { clearTimeout(id); resolve(null) })
   })
 }
@@ -93,16 +101,23 @@ async function fetchTexture(THREE, url, recolorWith) {
 }
 
 // → THREE.Texture | null. Nunca lança; falha devolve null (a peça cai na forma). Cache por sessão, com promessa compartilhada.
-export function loadFigure(stage, nome, { cor, tom, catalogoIndex } = {}) {
+export function loadFigure(stage, nome, { cor, tom, catalogoIndex, timeoutMs = LOAD_TIMEOUT_MS } = {}) {
   const mono = tom ? tom === 'mono' : isMono(nome)
   const ink = mono ? hexOf(cor) || (stage && stage.theme === 'light' ? LIGHT_INK : DARK_INK) : ''
   const key = `${nome}|${ink}`
   let p = cache.get(key)
   if (!p) {
-    p = withTimeout(
-      (async () => fetchTexture(stage.THREE, figuraUrl(nome, catalogoIndex), mono ? ink : undefined))(),
-      LOAD_TIMEOUT_MS,
-    ).then((tex) => { if (!tex) cache.delete(key); return tex }) // falha não fica em cache
+    const gen = generation
+    let timedOut = false
+    const raw = (async () => fetchTexture(stage.THREE, figuraUrl(nome, catalogoIndex), mono ? ink : undefined))()
+    raw.then((tex) => { // chegou depois do prazo ou de um clear: ninguém vai usar
+      if (tex && (timedOut || gen !== generation)) tex.dispose?.()
+      else if (tex) live.add(tex)
+    }, () => {})
+    p = withTimeout(raw, timeoutMs, () => { timedOut = true }).then((tex) => {
+      if (!tex) { if (cache.get(key) === p) cache.delete(key) } // falha não fica em cache
+      return tex
+    })
     cache.set(key, p)
   }
   return p

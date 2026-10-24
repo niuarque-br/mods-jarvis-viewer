@@ -1,6 +1,7 @@
 // Palco comum das cenas (three.js): renderer, câmera, rótulos HTML, pacotes, foco e cliques.
 // Regra R6: a conclusão de pacotes é por relógio (setTimeout); a posição visual vem de performance.now() a cada quadro.
 import * as THREE from 'three'
+import { clearFigureCache } from './figure.js'
 import { safeBounds } from './layout.js'
 
 const ACCENT = 0xD97757
@@ -291,6 +292,7 @@ export function createStage(container, { theme } = {}) {
       const on = focused ? focused.has(p.id) : false
       const want = focused === null ? 0.35 : on ? 1 : 0.12
       p.level += (want - p.level) * 0.06
+      p.object.userData.level = p.level // lido pelas peças (movimento e apagado)
       const pulse = on ? 1 + Math.sin(t * 4) * 0.05 : 1
       p.object.scale.setScalar(p.scale * (0.9 + p.level * 0.3) * pulse)
       for (const m of p.mats) m.emissiveIntensity = 0.08 + p.level * 0.9
@@ -367,6 +369,7 @@ export function createStage(container, { theme } = {}) {
     window.removeEventListener('resize', resize)
     ro?.disconnect()
     clear()
+    clearFigureCache() // texturas em cache morrem com o palco
     for (const o of base) disposeObject(o)
     tip.remove()
     for (const g of trailGeo) g.dispose()

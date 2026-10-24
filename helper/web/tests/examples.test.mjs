@@ -5,6 +5,17 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { register } from 'node:module'
+
+// hooks/*.ts importa './figuras' sem extensão (estilo do mod); o carregador do node não completa sozinho.
+// Este gancho refaz o pedido com .ts quando um relativo sem extensão não é achado.
+register('data:text/javascript,' + encodeURIComponent(String.raw`
+export async function resolve(specifier, context, next) {
+  try { return await next(specifier, context) } catch (e) {
+    if (e && e.code === 'ERR_MODULE_NOT_FOUND' && /^\.{1,2}\//.test(specifier) && !/\.[a-z]+$/i.test(specifier)) return next(specifier + '.ts', context)
+    throw e
+  }
+}`))
 
 const root = new URL('../../../', import.meta.url)
 const { validateScene } = await import(new URL('hooks/scene.ts', root).href)

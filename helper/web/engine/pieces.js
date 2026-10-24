@@ -67,17 +67,23 @@ function makeOutline(THREE, kind, color) {
 }
 
 // Opacidade nominal de cada material, para o movimento e o apagado multiplicarem sem acumular.
+// Materiais de figura/contorno são sempre transparentes; os da forma só enquanto a opacidade < 1 (evita ordenação torta).
 function fadeTargets(root) {
   const list = []
   root.traverse((o) => {
     if (!o.material) return
     for (const m of [].concat(o.material)) {
-      if (m.userData.baseOpacity === undefined) m.userData.baseOpacity = m.opacity
-      m.transparent = true
+      if (m.userData.baseOpacity === undefined) { m.userData.baseOpacity = m.opacity; m.userData.baseTransparent = m.transparent }
       list.push(m)
     }
   })
   return list
+}
+
+// Nível de foco do stage (≈0.12 apagada, 0.35 normal, 1 foco) → estado do movimento.
+export function estadoDoNivel(level) {
+  const l = Number.isFinite(level) ? level : 0.35
+  return l > 0.8 ? 'foco' : l < 0.2 ? 'apagada' : 'normal'
 }
 
 export async function makePiece(stage, peca, { estilo, padrao, cor, contorno } = {}) {
@@ -85,7 +91,9 @@ export async function makePiece(stage, peca, { estilo, padrao, cor, contorno } =
   const choice = escolherForma(peca, estilo, padrao)
   const outer = new THREE.Group() // o stage escala e posiciona este grupo
   const inner = new THREE.Group() // os movimentos só mexem aqui
+  const face = new THREE.Group() // sempre voltado à câmera: figura e contorno
   outer.add(inner)
+  inner.add(face)
   const color = cor === undefined || cor === null ? 0xE8ECF3 : cor
 
   let plane = null
@@ -98,7 +106,8 @@ export async function makePiece(stage, peca, { estilo, padrao, cor, contorno } =
         new THREE.PlaneGeometry(BASE, BASE),
         new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }),
       )
-      inner.add(plane)
+      plane.material.userData.alwaysTransparent = true
+      face.add(plane)
     }
   }
   if (!plane) {
@@ -106,33 +115,34 @@ export async function makePiece(stage, peca, { estilo, padrao, cor, contorno } =
     shape = makeShape(THREE, forma, color)
     inner.add(shape.group)
   }
-  if (contorno === 'pilula' || contorno === 'losango') inner.add(makeOutline(THREE, contorno, color))
+  if (contorno === 'pilula' || contorno === 'losango') {
+    const line = makeOutline(THREE, contorno, color)
+    line.material.userData.alwaysTransparent = true
+    face.add(line)
+  }
 
   const fades = fadeTargets(inner)
   const tipo = peca && peca.movimento
   const q = new THREE.Quaternion()
-  const spin = new THREE.Quaternion()
-  const yAxis = new THREE.Vector3(0, 1, 0)
-  const base = outer.scale.x || 1
 
   const off = stage.onFrame(() => {
-    // estado de foco, lido da escala que o stage aplicou: 0.9 (apagada) … 1.2 (foco)
-    const lvl = Math.min(Math.max((outer.scale.x / (outer.userData.baseScale || base) - 0.9) / 0.3, 0), 1)
-    const estado = lvl > 0.8 ? 'foco' : lvl < 0.2 ? 'apagada' : 'normal'
-    const m = motionAt(tipo, stage.now() / 1000, { intensidade: intensidade(estado) })
+    const lvl = Number.isFinite(outer.userData.level) ? outer.userData.level : 0.35 // escrito pelo stage a cada quadro
+    const m = motionAt(tipo, stage.now() / 1000, { intensidade: intensidade(estadoDoNivel(lvl)) })
     inner.position.y = m.dy
     inner.scale.setScalar(m.scale)
-    const dim = plane ? 0.45 + 0.55 * lvl : 1 // forma já escurece pelo emissivo do stage; figura escurece por opacidade
-    for (const f of fades) f.opacity = f.userData.baseOpacity * m.opacity * dim
-    if (shape) {
-      inner.rotation.y = m.rotY
-      for (const s of shape.spinners) { s.o.rotation.y += s.ry; s.o.rotation.x += s.rx }
-    } else if (plane) {
-      // plano sempre voltado à câmera; girar/balançar viram um giro do plano em torno do próprio eixo Y
-      outer.updateWorldMatrix(true, false)
-      outer.getWorldQuaternion(q).invert()
-      plane.quaternion.copy(q).multiply(stage.camera.quaternion).multiply(spin.setFromAxisAngle(yAxis, m.rotY))
+    if (shape) inner.rotation.y = m.rotY
+    const dim = plane ? 0.45 + 0.55 * Math.min(Math.max(lvl, 0), 1) : 1 // forma já escurece pelo emissivo do stage
+    for (const f of fades) {
+      f.opacity = f.userData.baseOpacity * m.opacity * dim
+      const t = f.userData.alwaysTransparent || f.userData.baseTransparent || f.opacity < 0.999
+      if (f.transparent !== t) { f.transparent = t; f.needsUpdate = true }
     }
+    // figura e contorno voltados à câmera; girar/balançar giram só o plano em torno do próprio Y
+    inner.updateWorldMatrix(true, false)
+    inner.getWorldQuaternion(q).invert()
+    face.quaternion.copy(q).multiply(stage.camera.quaternion)
+    if (plane) plane.rotation.y = m.rotY
+    if (shape) for (const s of shape.spinners) { s.o.rotation.y += s.ry; s.o.rotation.x += s.rx }
   })
   outer.userData.dispose = off
   outer.userData.fallback = choice.kind === 'figura' && !plane
