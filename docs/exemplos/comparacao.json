@@ -7,10 +7,10 @@
       "label": "Relacional",
       "detail": "Tabelas com esquema fixo e junções.",
       "items": [
-        { "id": "rel-vel", "label": "Leitura (mil/s)", "value": 40, "detail": "Leituras por segundo em consultas simples." },
-        { "id": "rel-esc", "label": "Escrita (mil/s)", "value": 15, "detail": "Escritas por segundo com garantias completas." },
-        { "id": "rel-esq", "label": "Esquema", "value": "rígido", "detail": "Mudar o esquema pede migração." },
-        { "id": "rel-jun", "label": "Junções", "value": "nativas" }
+        { "id": "rel-vel", "figura": "tabler/outline:bolt", "label": "Leitura (mil/s)", "value": 40, "detail": "Leituras por segundo em consultas simples." },
+        { "id": "rel-esc", "figura": "tabler/outline:file-text", "label": "Escrita (mil/s)", "value": 15, "detail": "Escritas por segundo com garantias completas." },
+        { "id": "rel-esq", "figura": "tabler/outline:table", "label": "Esquema", "value": "rígido", "detail": "Mudar o esquema pede migração." },
+        { "id": "rel-jun", "figura": "tabler/outline:network", "label": "Junções", "value": "nativas" }
       ]
     },
     {
@@ -18,10 +18,10 @@
       "label": "Documental",
       "detail": "Documentos flexíveis, sem junções nativas.",
       "items": [
-        { "id": "doc-vel", "label": "Leitura (mil/s)", "value": 55, "detail": "Leituras por segundo em consultas simples." },
-        { "id": "doc-esc", "label": "Escrita (mil/s)", "value": 30, "detail": "Escritas por segundo, com garantias mais leves." },
-        { "id": "doc-esq", "label": "Esquema", "value": "flexível", "detail": "Cada documento pode ter campos diferentes." },
-        { "id": "doc-jun", "label": "Junções", "value": "manuais" }
+        { "id": "doc-vel", "figura": "tabler/outline:bolt", "label": "Leitura (mil/s)", "value": 55, "detail": "Leituras por segundo em consultas simples." },
+        { "id": "doc-esc", "figura": "tabler/outline:file-text", "label": "Escrita (mil/s)", "value": 30, "detail": "Escritas por segundo, com garantias mais leves." },
+        { "id": "doc-esq", "figura": "tabler/outline:table", "label": "Esquema", "value": "flexível", "detail": "Cada documento pode ter campos diferentes." },
+        { "id": "doc-jun", "figura": "tabler/outline:network", "label": "Junções", "value": "manuais" }
       ]
     }
   ],

@@ -2,12 +2,12 @@
   "title": "Como o viewer trata um pedido",
   "type": "fluxo",
   "nodes": [
-    { "id": "ini", "label": "Pedido", "kind": "inicio", "detail": "Você pede uma explicação visual." },
-    { "id": "val", "label": "Validar cena", "kind": "etapa", "detail": "O mod confere ids, limites e campos." },
-    { "id": "ok", "label": "Cena válida?", "kind": "decisao", "detail": "Só uma cena válida chega à página." },
-    { "id": "env", "label": "Enviar à página", "kind": "etapa", "detail": "O auxiliar guarda a cena e a transmite." },
-    { "id": "err", "label": "Devolver o erro", "kind": "etapa", "detail": "A ferramenta diz qual campo está errado." },
-    { "id": "fim", "label": "Cena exibida", "kind": "fim" }
+    { "id": "ini", "figura": "tabler/outline:user", "label": "Pedido", "kind": "inicio", "detail": "Você pede uma explicação visual." },
+    { "id": "val", "figura": "tabler/outline:shield", "label": "Validar cena", "kind": "etapa", "detail": "O mod confere ids, limites e campos." },
+    { "id": "ok", "figura": "tabler/outline:help", "label": "Cena válida?", "kind": "decisao", "detail": "Só uma cena válida chega à página." },
+    { "id": "env", "figura": "tabler/outline:send", "label": "Enviar à página", "kind": "etapa", "detail": "O auxiliar guarda a cena e a transmite." },
+    { "id": "err", "figura": "tabler/outline:alert-triangle", "label": "Devolver o erro", "kind": "etapa", "detail": "A ferramenta diz qual campo está errado." },
+    { "id": "fim", "figura": "tabler/outline:circle-check", "label": "Cena exibida", "kind": "fim" }
   ],
   "edges": [
     { "from": "ini", "to": "val" },

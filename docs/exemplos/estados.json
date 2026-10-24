@@ -2,11 +2,11 @@
   "title": "Estados do Jarvis",
   "type": "estados",
   "states": [
-    { "id": "ocioso", "label": "Ocioso", "initial": true, "detail": "Esperando a palavra de ativação." },
-    { "id": "ouvindo", "label": "Ouvindo", "detail": "Captando a sua fala." },
-    { "id": "pensando", "label": "Pensando", "detail": "O Claude monta a resposta." },
-    { "id": "falando", "label": "Falando", "detail": "Lendo a resposta em voz alta." },
-    { "id": "erro", "label": "Erro", "detail": "Algo falhou; volta ao repouso." }
+    { "id": "ocioso", "figura": "tabler/outline:clock", "label": "Ocioso", "initial": true, "detail": "Esperando a palavra de ativação." },
+    { "id": "ouvindo", "figura": "tabler/outline:microphone", "label": "Ouvindo", "detail": "Captando a sua fala." },
+    { "id": "pensando", "figura": "tabler/outline:brain", "movimento": "respirar", "label": "Pensando", "detail": "O Claude monta a resposta." },
+    { "id": "falando", "figura": "tabler/outline:headphones", "label": "Falando", "detail": "Lendo a resposta em voz alta." },
+    { "id": "erro", "figura": "tabler/outline:alert-triangle", "label": "Erro", "detail": "Algo falhou; volta ao repouso." }
   ],
   "transitions": [
     { "from": "ocioso", "to": "ouvindo", "label": "ativação" },

@@ -9,9 +9,13 @@ Decida sozinho quando uma cena ajuda mais do que texto.`
 const ON_DEMAND = `Use o viewer só quando o usuário pedir (por exemplo com /viewer ou "mostre no viewer"); sem pedido, responda só com texto.
 Quando ele pedir, monte a cena do que foi pedido: conceito com partes, arquitetura, fluxo, sequência de passos, evolução no tempo ou resultado numérico.`
 
+// Figures: how to find, pick and combine them; the owner's explicit request always wins.
+const FIGURAS = `Figuras: dê a cada peça uma figura do assunto com buscar_figura (conceito em português ou inglês; uma opção por peça). Um estilo dominante por cena: fluent/3d para coisas e pessoas, tabler/outline ou phosphor/duotone para conceitos. Evite tom: escura; na dúvida, fique na forma geométrica.
+Em pedido explícito do dono, ele vence: "use caixas" vira estilo.forma (e tire o shape das peças), "árvore deitada" vira estilo.arranjo "horizontal" (só arvore, fluxo, camadas). Movimentos (em 1 ou 2 peças): girar, pulsar, balancar, subir, respirar, piscar.`
+
 /** Text added to every prompt.compose; an unknown value counts as "IA escolhe". */
 export function guidance(presentation: string): string {
-  return `${INTRO}\n${presentation === 'Sob demanda' ? ON_DEMAND : AUTO}\n${CHAT}`
+  return `${INTRO}\n${presentation === 'Sob demanda' ? ON_DEMAND : AUTO}\n${FIGURAS}\n${CHAT}`
 }
 
 /** What /viewer submits as the user's message. */

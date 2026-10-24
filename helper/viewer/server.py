@@ -46,6 +46,7 @@ class ViewerServer(ThreadingHTTPServer):
         self.on_quit = on_quit
         self.state_lock = threading.Lock()
         self.pages = 0
+        self.figuras_served = 0  # contador de depuração (smoke), não aparece para o usuário
         self.last_scene: dict | None = None
         self.last_mode: dict | None = None
 
@@ -135,7 +136,7 @@ def make_server(
             if path == "/events":
                 return self._events()
             if path == "/state":
-                return self._json(200, {"pages": self.server.pages})
+                return self._json(200, {"pages": self.server.pages, "figuras": self.server.figuras_served})
             decoded = unquote(path).lstrip("/")
             if decoded.startswith("figuras/"):
                 return self._figura(decoded[len("figuras/"):])
@@ -165,6 +166,8 @@ def make_server(
             extra = {"Cache-Control": "max-age=86400"}
             if ctype == "image/svg+xml":
                 extra["X-Content-Type-Options"] = "nosniff"
+                extra["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
+            self.server.figuras_served += 1
             self._send(200, body, ctype, extra)
 
         def _closed(self) -> bool:

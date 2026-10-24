@@ -166,7 +166,7 @@ def test_reconexao_rapida_termina_em_page_open(helper):
     for _ in range(60):
         page.close()
         page = Page(helper)
-        assert wait_for(lambda: get(helper, f"/state?t={TOKEN}")[1] == {"pages": 1})
+        assert wait_for(lambda: get(helper, f"/state?t={TOKEN}")[1]["pages"] == 1)
         time.sleep(0.05)
         assert types(out)[-1] == "page-open"
     page.close()
@@ -221,7 +221,7 @@ def test_page_closed_so_quando_a_ultima_fecha(helper):
     a, b = Page(helper), Page(helper)
     assert wait_for(lambda: types(out).count("page-open") == 2)
     a.close()
-    assert wait_for(lambda: get(helper, f"/state?t={TOKEN}")[1] == {"pages": 1})
+    assert wait_for(lambda: get(helper, f"/state?t={TOKEN}")[1]["pages"] == 1)
     assert "page-closed" not in types(out)
     b.close()
     assert wait_for(lambda: "page-closed" in types(out))
@@ -242,11 +242,11 @@ def test_evento_desconhecido(helper):
 
 
 def test_state_conta_paginas(helper):
-    assert get(helper, f"/state?t={TOKEN}") == (200, {"pages": 0})
+    assert get(helper, f"/state?t={TOKEN}")[1]["pages"] == 0
     page = Page(helper)
-    assert wait_for(lambda: get(helper, f"/state?t={TOKEN}")[1] == {"pages": 1})
+    assert wait_for(lambda: get(helper, f"/state?t={TOKEN}")[1]["pages"] == 1)
     page.close()
-    assert wait_for(lambda: get(helper, f"/state?t={TOKEN}")[1] == {"pages": 0})
+    assert wait_for(lambda: get(helper, f"/state?t={TOKEN}")[1]["pages"] == 0)
 
 
 def test_quit_chama_on_quit(helper):
@@ -374,6 +374,18 @@ def test_figuras_png_e_svg_com_tipo_certo(figuras_helper):
     status_, headers, _ = fig_get(figuras_helper, f"/{TOKEN}/figuras/tabler/gear.svg")
     assert status_ == 200 and headers["Content-Type"] == "image/svg+xml"
     assert headers["X-Content-Type-Options"] == "nosniff"
+    assert headers["Content-Security-Policy"] == "default-src 'none'; style-src 'unsafe-inline'; sandbox"
+    _, headers, _ = fig_get(figuras_helper, f"/{TOKEN}/figuras/fluent/3d/gear.png")
+    assert "Content-Security-Policy" not in headers
+
+
+def test_state_conta_figuras_servidas(figuras_helper):
+    def served():
+        return json.loads(fig_get(figuras_helper, f"/state?t={TOKEN}")[2])["figuras"]
+    assert served() == 0
+    fig_get(figuras_helper, f"/{TOKEN}/figuras/tabler/gear.svg")
+    fig_get(figuras_helper, f"/{TOKEN}/figuras/tabler/nao-existe.svg")
+    assert served() == 1
 
 
 def test_figuras_sem_token_401(figuras_helper):

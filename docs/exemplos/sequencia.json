@@ -2,11 +2,11 @@
   "title": "Do pedido à cena no viewer",
   "type": "sequencia",
   "actors": [
-    { "id": "voce", "label": "Você", "detail": "Quem pede a explicação." },
-    { "id": "claude", "label": "Claude", "detail": "Monta a cena e chama a ferramenta." },
-    { "id": "mod", "label": "Mod", "detail": "Valida a cena e a entrega ao auxiliar." },
-    { "id": "aux", "label": "Auxiliar", "detail": "Guarda a última cena e fala com a página." },
-    { "id": "pagina", "label": "Página", "detail": "Desenha a cena no navegador embutido." }
+    { "id": "voce", "figura": "fluent/3d:person", "label": "Você", "detail": "Quem pede a explicação." },
+    { "id": "claude", "figura": "fluent/3d:brain", "label": "Claude", "detail": "Monta a cena e chama a ferramenta." },
+    { "id": "mod", "figura": "fluent/3d:gear", "label": "Mod", "detail": "Valida a cena e a entrega ao auxiliar." },
+    { "id": "aux", "figura": "fluent/3d:laptop", "label": "Auxiliar", "detail": "Guarda a última cena e fala com a página." },
+    { "id": "pagina", "figura": "fluent/3d:desktop-computer", "label": "Página", "detail": "Desenha a cena no navegador embutido." }
   ],
   "messages": [
     { "id": "m1", "from": "voce", "to": "claude", "label": "pede uma explicação" },

@@ -19,6 +19,7 @@ Pessoas entendem melhor vendo como as coisas funcionam. Um parágrafo sobre "o a
 - **Passo a passo narrado**: cada passo da cena acende as peças da vez e avança junto com a frase.
 - **Integra com o [Modo Jarvis](https://github.com/niuarque-br/mods-jarvis)**: com o Jarvis ligado, é ele quem narra, com a voz dele, e a cena acompanha a fala.
 - **Narração ou legenda** num interruptor na própria tela.
+- **Figuras nas peças**: ícones e emojis (3D, coloridos ou de traço) no lugar das formas, com movimentos discretos (girar, pulsar, respirar...).
 - **Clique numa peça** para o Claude explicar aquela parte.
 - **Sob demanda ou por iniciativa do Claude**: você escolhe nas opções.
 
@@ -61,11 +62,14 @@ claude plugin install jarvis-viewer --marketplace niuarque-br/mods-jarvis-viewer
 
 Depois abra uma sessão nova ou rode `/reload-plugins`.
 
+**Figuras (uma vez):** as figuras não vêm no repositório. Rode `python scripts/baixar-figuras.py` uma vez na pasta do plugin; o script baixa os pacotes de licença livre (Fluent Emoji, Tabler, Lucide e Phosphor) para `assets/figuras/` e gera o catálogo. Sem isso o viewer funciona normalmente, só com as formas geométricas, e a busca avisa "figuras não instaladas".
+
 ## Usar
 
 - **Sob demanda**: clique em **🧊 Jarvis Viewer** acima do prompt, digite `/viewer`, peça "mostra num desenho" ou, com o Jarvis ligado, diga isso em voz alta.
 - **Claude escolhe**: o Claude abre o viewer sozinho quando um desenho ajuda. Respostas curtas e ajustes pontuais continuam só em texto.
 - Na tela: **▶** reproduz, **⟲** recomeça, e o interruptor **🔊 Narração / 💬 Legenda** troca o modo. Arraste para girar a cena.
+- **Figuras**: o Claude procura uma figura para cada peça (`buscar_figura`) e mantém um estilo só na cena. Peça do seu jeito: "use caixas no lugar de círculos" troca as formas da cena toda, "árvore deitada" põe árvore, fluxo ou camadas na horizontal, e "use um ícone de engrenagem no auxiliar" escolhe a figura de uma peça.
 - Peça "de novo" ou "volta no passo 3" para rever a última cena.
 
 ## Opções
@@ -104,15 +108,30 @@ claude plugin validate .          # manifesto
 claude plugin test .              # testes do mod (hooks/*.test.ts)
 cd helper && python -m pytest -q  # testes do auxiliar
 node --test helper/web/tests/*.test.mjs   # lógica da página
+python -m pytest -q scripts                # testes do script de figuras
+python scripts/baixar-figuras.py  # baixa as figuras e gera o catálogo (uma vez; fica fora do git)
 powershell -ExecutionPolicy Bypass -File scripts/build-helper.ps1   # gera bin/viewer-helper.exe
 python scripts/smoke.py           # ponta a ponta: exe + Edge headless
 ```
+
+As figuras não entram no exe: ele as procura em `<plugin>/assets/figuras`. Os testes de exemplos conferem os nomes de figura contra o catálogo real e pulam essa parte sem ele.
 
 O mod prefere `bin/viewer-helper.exe`; sem ele, cai para `python -m viewer` em `helper/`. O auxiliar não tem dependências de runtime, e o build só precisa do PyInstaller (venv `.venv-build`, fora do git).
 
 ## Créditos
 
 - Cenas 3D feitas com [three.js](https://threejs.org) (MIT).
+
+### Créditos das figuras
+
+Baixadas por `scripts/baixar-figuras.py`, não redistribuídas neste repositório. Só licenças MIT e ISC.
+
+| Pacote | Autoria | Licença | Link |
+|---|---|---|---|
+| Fluent Emoji | Microsoft | MIT | [microsoft/fluentui-emoji](https://github.com/microsoft/fluentui-emoji) |
+| Tabler Icons | Paweł Kuna | MIT | [tabler.io/icons](https://tabler.io/icons) |
+| Lucide | Contribuidores do Lucide | ISC | [lucide.dev](https://lucide.dev) |
+| Phosphor Icons | Phosphor Icons | MIT | [phosphoricons.com](https://phosphoricons.com) |
 
 ## Licença
 

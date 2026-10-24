@@ -2,10 +2,10 @@
   "title": "As camadas de uma requisição web",
   "type": "camadas",
   "layers": [
-    { "id": "ui", "label": "Interface", "items": ["Página", "Formulário", "Botões"], "detail": "O que a pessoa vê e toca." },
-    { "id": "api", "label": "API", "items": ["Rotas", "Validação", "Autenticação"], "detail": "Recebe o pedido e decide o que fazer." },
-    { "id": "dominio", "label": "Regras de negócio", "items": ["Pedidos", "Preços", "Estoque"], "detail": "As regras que não dependem de tela nem de banco." },
-    { "id": "dados", "label": "Banco de dados", "items": ["Tabelas", "Índices"], "detail": "Onde tudo fica guardado." }
+    { "id": "ui", "figura": "phosphor/duotone:browser", "label": "Interface", "items": ["Página", "Formulário", "Botões"], "detail": "O que a pessoa vê e toca." },
+    { "id": "api", "figura": "phosphor/duotone:network", "label": "API", "items": ["Rotas", "Validação", "Autenticação"], "detail": "Recebe o pedido e decide o que fazer." },
+    { "id": "dominio", "figura": "phosphor/duotone:cpu", "label": "Regras de negócio", "items": ["Pedidos", "Preços", "Estoque"], "detail": "As regras que não dependem de tela nem de banco." },
+    { "id": "dados", "figura": "phosphor/duotone:database", "label": "Banco de dados", "items": ["Tabelas", "Índices"], "detail": "Onde tudo fica guardado." }
   ],
   "steps": [
     { "say": "Uma requisição atravessa quatro camadas, cada uma com uma responsabilidade.", "hops": [] },

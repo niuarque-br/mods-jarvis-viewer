@@ -1,6 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 
 import { guidance, viewerPrompt } from './guidance'
+import { TOOL_DESCRIPTION } from './register'
 import { world } from './testkit'
 
 const COMPOSE = { model: 'm', promptModel: 'm', surfaces: [], tools: [], outputStyle: { name: 'default', isKeepingCodingInstructions: true }, traits: [] } as never
@@ -10,17 +11,28 @@ test('IA escolhe orienta quando usar e quando não', () => {
   const g = guidance('IA escolhe')
   for (const s of ['mostrar_cena', 'arquitetura', 'resposta curta', 'preview_start', 'uma frase curta antes']) expect(g).toContain(s)
   expect(g).not.toContain('só quando o usuário pedir')
-  expect(g.length).toBeLessThan(1200)
+  expect(g.length).toBeLessThan(1800)
 })
 test('valor desconhecido conta como IA escolhe', () => expect(guidance('xyz')).toBe(guidance('IA escolhe')))
 test('Sob demanda só quando pedir', () => {
   const g = guidance('Sob demanda')
   expect(g).toContain('só quando o usuário pedir')
-  expect(g.length).toBeLessThan(1200)
+  expect(g.length).toBeLessThan(1800)
   // the criteria apply only once the user asks: no unconditional "Use para:" (final review minor)
   expect(g).not.toContain('Use para:')
   expect(g.indexOf('só quando o usuário pedir')).toBeLessThan(g.indexOf('arquitetura'))
   for (const s of ['mostrar_cena', 'preview_start', 'uma frase curta antes']) expect(g).toContain(s)
+})
+test('os dois modos orientam figuras', () => {
+  for (const modo of ['IA escolhe', 'Sob demanda']) {
+    const g = guidance(modo)
+    for (const s of ['buscar_figura', 'pedido explícito', 'estilo.forma', 'estilo.arranjo', 'tom: escura', 'forma geométrica', 'girar', 'respirar']) expect(g).toContain(s)
+    expect(g.length).toBeLessThan(1800)
+  }
+})
+test('a descrição de mostrar_cena cita figura, movimento e estilo', () => {
+  for (const s of ['figura', 'movimento', 'estilo', 'buscar_figura']) expect(TOOL_DESCRIPTION).toContain(s)
+  expect(TOOL_DESCRIPTION.length).toBeLessThanOrEqual(4096)
 })
 test('viewerPrompt vazio', () => expect(viewerPrompt('  ')).toBe('Mostre no viewer a explicação anterior.'))
 test('viewerPrompt com assunto', () => expect(viewerPrompt('o cache')).toBe('Explique o cache mostrando no viewer.'))

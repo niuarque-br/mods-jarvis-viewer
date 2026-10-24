@@ -83,6 +83,21 @@ def main() -> int:
         if not wait_for(lambda e: e.get("type") == "step-done" and e.get("step") == 0, TIMEOUT):
             print("FALHOU: step-done do passo 0 não chegou. Eventos vistos:", seen)
             return 1
+        # A cena de exemplo tem figuras: a página precisa ter pedido figuras/ ao auxiliar (contador do /state).
+        if (ROOT / "assets" / "figuras").is_dir():
+            end = time.time() + 10
+            served = 0
+            while time.time() < end and served < 1:
+                with urllib.request.urlopen(f"http://127.0.0.1:{port}/state?t={token}", timeout=5) as r:
+                    served = json.loads(r.read()).get("figuras", 0)
+                if served < 1:
+                    time.sleep(0.3)
+            if served < 1:
+                print("FALHOU: a página não pediu nenhuma figura ao auxiliar")
+                return 1
+            print(f"figuras servidas: {served}")
+        else:
+            print("aviso: sem assets/figuras, a parte das figuras foi pulada (rode scripts/baixar-figuras.py)")
         try:
             urllib.request.urlopen(urllib.request.Request(
                 f"http://127.0.0.1:{port}/cmd", data=b'{"type":"quit"}', method="POST",
