@@ -64,3 +64,12 @@ test('flowBend horizontal: avançar um nível é reta; voltar contorna; vertical
   assert.ok(back[0] !== 0 || back[1] !== 0)
   assert.deepEqual(fb([0, 0, 0], [0, -2.6, 0]), [0, 0])
 })
+
+test('fluxo: estilo.forma no lugar de início/fim/decisão mantém o contorno do significado', () => {
+  const sc = { estilo: { forma: 'esfera' } }
+  assert.equal(flowPiece({ kind: 'decisao' }, sc).contorno, 'losango')
+  assert.equal(flowPiece({ kind: 'inicio' }, sc).contorno, 'pilula')
+  assert.equal(flowPiece({ kind: 'fim' }, sc).contorno, 'pilula')
+  assert.equal(flowPiece({ kind: 'etapa' }, sc).contorno, undefined)
+  assert.equal(flowPiece({ kind: 'decisao' }, { estilo: { forma: 'bola' } }).contorno, undefined) // forma inválida: desenho de hoje
+})

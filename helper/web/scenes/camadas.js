@@ -2,7 +2,7 @@
 // O foco afasta as placas acima e abaixo; hops sobem ou descem entre placas.
 // Não importa three: usa stage.THREE, então as funções puras abaixo rodam em `node --test`.
 // Com estilo.arranjo = 'horizontal' as placas ficam em pé, lado a lado (a primeira, o topo, à esquerda).
-import { makePiece, stale, gone } from '../engine/pieces.js'
+import { makePiece, stale, gone, keepFigure } from '../engine/pieces.js'
 
 const PALETTE = [0xD97757, 0x5B8DEF, 0x36C5A0, 0xE5B94E, 0xB58AE6, 0xE86A92, 0x62C7E8, 0x9AD66B]
 const GAP_Y = 2.1 // distância entre placas
@@ -99,6 +99,7 @@ export async function build(scene, stage, alive) {
   const plateSize = horiz ? [HPLATE_W, HPLATE_TALL, PLATE_D] : [PLATE_W, PLATE_H, PLATE_D]
   const figs = await Promise.all(layers.map((l) => (l.figura ? makePiece(stage, l, { estilo: scene.estilo, padrao: 'caixa', cor: PALETTE[layers.indexOf(l) % PALETTE.length] }) : null)))
   if (stale(alive, figs)) return gone()
+  for (let i = 0; i < figs.length; i++) figs[i] = keepFigure(figs[i]) // figura que falhou: sem cubinho solto
 
   layers.forEach((l, i) => {
     const color = PALETTE[i % PALETTE.length]

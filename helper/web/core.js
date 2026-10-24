@@ -79,6 +79,12 @@ export function isUserPiece(id) {
   return typeof id === 'string' && id !== '' && !id.startsWith('__')
 }
 
+// Nó que um clique escolhe: a figura `__fig:<id>` vale pela peça <id> (camada ou item); outros ids internos, nenhum.
+export function pickTarget(id) {
+  if (typeof id === 'string' && id.startsWith('__fig:')) id = id.slice(6)
+  return isUserPiece(id) ? id : null
+}
+
 export function pickVoice(voices) {
   const pt = (voices || []).filter((v) => v && String(v.lang || '').toLowerCase().replace('_', '-') === 'pt-br')
   const named = (n) => pt.find((v) => String(v.name).startsWith(n))

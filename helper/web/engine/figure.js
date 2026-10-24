@@ -2,7 +2,8 @@
 // Regra R3: o SVG nunca entra no DOM; vira Blob → Image → canvas → CanvasTexture.
 const MONO_STYLES = new Set(['tabler/outline', 'tabler/filled', 'lucide/line', 'fluent/hc'])
 const RASTER = 256
-const LOAD_TIMEOUT_MS = 8000
+// Curto: a narração do passo não espera; uma figura lenta cai na forma em vez de aparecer bem depois da fala.
+export const LOAD_TIMEOUT_MS = 3000
 const DARK_INK = '#cfd6e4'
 const LIGHT_INK = '#2b3140'
 

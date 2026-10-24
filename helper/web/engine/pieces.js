@@ -138,7 +138,7 @@ export async function makePiece(stage, peca, { estilo, padrao, cor, contorno, de
     inner.position.y = m.dy
     inner.scale.setScalar(m.scale)
     if (shape) inner.rotation.y = m.rotY
-    const dim = plane ? 0.45 + 0.55 * Math.min(Math.max(lvl, 0), 1) : 1 // forma já escurece pelo emissivo do stage
+    const dim = plane && estadoDoNivel(lvl) === 'apagada' ? 0.45 : 1 // figura opaca em repouso; forma já escurece pelo emissivo do stage
     for (const f of fades) {
       f.opacity = f.userData.baseOpacity * m.opacity * dim
       const t = f.userData.alwaysTransparent || f.userData.baseTransparent || f.opacity < 0.999
@@ -154,6 +154,14 @@ export async function makePiece(stage, peca, { estilo, padrao, cor, contorno, de
   outer.userData.dispose = off
   outer.userData.fallback = choice.kind === 'figura' && !plane
   return outer
+}
+
+// Figura de apoio (ao lado de camada/item): se não carregou, a forma de queda seria um cubinho solto; solta e some.
+export function keepFigure(obj) {
+  if (!obj) return null
+  if (!obj.userData || !obj.userData.fallback) return obj
+  if (typeof obj.userData.dispose === 'function') obj.userData.dispose()
+  return null
 }
 
 // Uma montagem assíncrona que ficou velha (outra cena chegou) não pode tocar no palco: solta as peças já criadas

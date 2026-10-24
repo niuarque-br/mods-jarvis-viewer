@@ -4,14 +4,15 @@ import * as THREE from '../vendor/three.module.min.js'
 
 function recStage() {
   const calls = []
+  const ids = []
   const cbs = new Set()
   const note = (k) => (...a) => { calls.push(k); return k === 'packet' || k === 'wait' ? Promise.resolve() : undefined }
   return {
-    calls, cbs, THREE, theme: 'dark', tubeColor: 0x888888, camera: new THREE.PerspectiveCamera(),
+    calls, ids, cbs, THREE, theme: 'dark', tubeColor: 0x888888, camera: new THREE.PerspectiveCamera(),
     scene: { add: note('scene.add'), remove: note('scene.remove') },
     onFrame: (cb) => { cbs.add(cb); return () => cbs.delete(cb) },
     now: () => 1000,
-    addPiece: note('addPiece'), fit: note('fit'), focus: note('focus'), packet: note('packet'), wait: note('wait'),
+    addPiece: (id, ...a) => { ids.push(String(id)); return note('addPiece')(id, ...a) }, fit: note('fit'), focus: note('focus'), packet: note('packet'), wait: note('wait'),
   }
 }
 const mini = {
@@ -25,6 +26,11 @@ const mini = {
   metafora: { objects: [{ id: 'o', shape: 'figura', figura: 'x/y:z' }] },
 }
 globalThis.fetch = async () => ({ ok: false, status: 404 })
+// Peças que cada montagem viva tem de pôr no palco (as figuras de mini não carregam: 404).
+const expected = {
+  arquitetura: ['a', 'b'], fluxo: ['a', 'b'], arvore: ['r', 'a'], sequencia: ['a', 'b'], estados: ['a', 'b'],
+  camadas: ['l'], comparacao: ['l', 'r', 'l1', 'r1'], metafora: ['o'],
+}
 
 for (const [tipo, sc] of Object.entries(mini)) {
   test(`${tipo}: montagem velha não toca no palco nem deixa callbacks`, async () => {
@@ -40,8 +46,9 @@ for (const [tipo, sc] of Object.entries(mini)) {
     const mod = await import(`../scenes/${tipo}.js`)
     const stage = recStage()
     const built = await mod.build({ type: tipo, steps: [], ...sc }, stage, () => true)
-    assert.ok(stage.calls.includes('addPiece') || tipo === 'estados' || true)
-    assert.ok(stage.calls.length > 0)
+    for (const id of expected[tipo]) assert.ok(stage.ids.includes(id), `${tipo}: peça ${id} no palco (${stage.ids})`)
+    // figura que caiu na forma não deixa peça solta ao lado da camada/item
+    if (tipo === 'camadas' || tipo === 'comparacao') assert.ok(!stage.ids.some((id) => id.startsWith('__fig:')), String(stage.ids))
     built.dispose()
   })
 }

@@ -1,6 +1,6 @@
 // Cola da página: SSE, controles, legenda e fala. A lógica de reprodução está em core.js (puro).
 // Conclusão de passo é por relógio (setTimeout/Promise), nunca por contagem de quadros (rAF para em aba de fundo).
-import { History, nextAction, stepMs, pickVoice, isUserPiece, StepGate, voiceHoldMs } from './core.js'
+import { History, nextAction, stepMs, pickVoice, pickTarget, StepGate, voiceHoldMs } from './core.js'
 import { createStage, systemTheme } from './engine/stage.js'
 
 // O token vai no caminho (/TOKEN/): todas as URLs são relativas, sem token no código.
@@ -47,7 +47,8 @@ try {
 }
 // Clique numa peça: manda pick{scene,node} ao auxiliar.
 export function pick(node) {
-  if (current && isUserPiece(node)) post({ type: 'pick', scene: current.id, node })
+  const target = pickTarget(node)
+  if (current && target) post({ type: 'pick', scene: current.id, node: target })
 }
 window.jarvisViewer = { pick }
 

@@ -115,3 +115,44 @@ test('makePiece: desenho de hoje vale sem estilo.forma e na queda da figura; est
   assert.ok(achou(await makePiece(fakeStage(), { figura: 'x/y:z' }, { padrao: 'esfera', desenho: marca })))
   assert.ok(!achou(await makePiece(fakeStage(), {}, { estilo: { forma: 'caixa' }, padrao: 'esfera', desenho: marca })))
 })
+
+// ---- revisão final da branch ----
+import { keepFigure } from '../engine/pieces.js'
+
+function fakeImages() {
+  globalThis.fetch = async () => ({ ok: true, status: 200, text: async () => '<svg viewBox="0 0 1 1"><path stroke="currentColor"/></svg>' })
+  globalThis.Image = class { set src(_) { setTimeout(() => this.onload?.(), 1) } get naturalWidth() { return 24 } get naturalHeight() { return 24 } }
+  globalThis.document = { createElement: () => ({ width: 0, height: 0, getContext: () => ({ drawImage() {} }) }) }
+}
+
+test('makePiece: figura fica opaca no nível normal e no foco; só a apagada escurece', async () => {
+  clearFigureCache()
+  fakeImages()
+  const stage = fakeStage()
+  const obj = await makePiece(stage, { figura: 'lucide/line:ok' }, { padrao: 'caixa', cor: 0xffffff })
+  assert.equal(obj.userData.fallback, false)
+  let plane
+  obj.traverse((o) => { if (o.isMesh && o.geometry?.type === 'PlaneGeometry') plane = o })
+  assert.ok(plane)
+  for (const [lvl, want] of [[0.35, 1], [1, 1]]) {
+    obj.userData.level = lvl
+    stage.tick()
+    assert.equal(plane.material.opacity, want, `nível ${lvl}`)
+  }
+  obj.userData.level = 0.12
+  stage.tick()
+  assert.ok(plane.material.opacity < 0.7)
+  obj.userData.dispose()
+  clearFigureCache()
+})
+
+test('keepFigure: figura que caiu na forma some (solta o quadro); a que carregou fica', () => {
+  let freed = 0
+  const caiu = { userData: { fallback: true, dispose: () => freed++ } }
+  assert.equal(keepFigure(caiu), null)
+  assert.equal(freed, 1)
+  const ok = { userData: { fallback: false, dispose: () => freed++ } }
+  assert.equal(keepFigure(ok), ok)
+  assert.equal(freed, 1)
+  assert.equal(keepFigure(null), null)
+})

@@ -2,7 +2,7 @@
 // comparável entre os lados (mesma escala, partindo do zero); texto aparece como legenda do item.
 // Não importa three: usa stage.THREE, então as funções puras abaixo rodam em `node --test`.
 import { formatValue, chartScale, valueDigits } from './grafico.js'
-import { makePiece, stale, gone } from '../engine/pieces.js'
+import { makePiece, stale, gone, keepFigure } from '../engine/pieces.js'
 
 const COLORS = [0xD97757, 0x5B8DEF]
 const COL_X = 3.5
@@ -89,7 +89,7 @@ export async function build(scene, stage, alive) {
   const wanted = sides.flatMap((side) => itemsOf(side).filter((it) => it && it.id !== undefined && it.figura))
   const loaded = await Promise.all(wanted.map((it, k) => makePiece(stage, it, { padrao: 'caixa', cor: COLORS[sides.findIndex((sd) => itemsOf(sd).includes(it)) % 2] })))
   if (stale(alive, loaded)) return gone()
-  wanted.forEach((it, k) => figs.set(String(it.id), loaded[k]))
+  wanted.forEach((it, k) => { const f = keepFigure(loaded[k]); if (f) figs.set(String(it.id), f) }) // figura que falhou: sem cubinho solto
 
   sides.forEach((side, s) => {
     const x = (s === 0 ? -1 : 1) * COL_X

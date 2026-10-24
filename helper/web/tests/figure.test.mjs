@@ -89,3 +89,10 @@ test('clearFigureCache com carga em andamento: a imagem tardia é liberada', asy
   await new Promise((res) => setTimeout(res, 20))
   assert.equal(made[0].disposed, 1)
 })
+
+// ---- revisão final da branch ----
+import { LOAD_TIMEOUT_MS } from '../engine/figure.js'
+
+test('prazo da figura é curto (3 s): a narração não corre muito à frente da imagem', () => {
+  assert.equal(LOAD_TIMEOUT_MS, 3000)
+})

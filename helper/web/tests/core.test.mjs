@@ -250,3 +250,16 @@ test('voiceHoldMs: voz que falha logo mantém o tempo mínimo da legenda (M6)', 
   assert.equal(voiceHoldMs('x'.repeat(40), 100, false), 0)
   assert.equal(voiceHoldMs(undefined, 0, true), 0)
 })
+
+// ---- revisão final da branch ----
+import { pickTarget } from '../core.js'
+
+test('pickTarget: clique na figura de uma peça vale pela peça; outros ids internos não', () => {
+  assert.equal(pickTarget('api'), 'api')
+  assert.equal(pickTarget('__fig:camada1'), 'camada1')
+  assert.equal(pickTarget('__fig:'), null)
+  assert.equal(pickTarget('__fig:__x'), null)
+  assert.equal(pickTarget('__item:l:0'), null)
+  assert.equal(pickTarget('__cat:2'), null)
+  assert.equal(pickTarget(undefined), null)
+})

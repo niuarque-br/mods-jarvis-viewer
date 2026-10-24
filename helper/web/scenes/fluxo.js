@@ -2,7 +2,7 @@
 // e as arestas rotuladas mostram o rótulo quando o marcador passa. Câmera de frente (planar).
 // Não importa three: usa stage.THREE, então as funções puras abaixo rodam em `node --test`.
 import { layered, arrange } from '../engine/layout.js'
-import { makePiece, stale, gone } from '../engine/pieces.js'
+import { makePiece, stale, gone, FORMAS } from '../engine/pieces.js'
 import { pathEdges, lastStop, markerPos, createMarker, addArrowHead } from '../engine/flowkit.js'
 
 export { pathEdges, lastStop, markerPos }
@@ -33,9 +33,12 @@ export function flowBend(a, b, horizontal = false) {
 
 const CONTORNO = { inicio: 'pilula', fim: 'pilula', decisao: 'losango' }
 
-// Opções da peça de um nó. O contorno da forma original só entra quando o nó é desenhado por uma figura.
+// Opções da peça de um nó. O contorno da forma original (pílula, losango) entra quando o nó não é desenhado por ela:
+// figura no nó, ou estilo.forma da cena trocando as formas — assim início, fim e decisão continuam reconhecíveis.
 export function pieceOptions(n, scene) {
-  return { estilo: scene && scene.estilo, padrao: 'caixa', contorno: n && n.figura ? CONTORNO[n.kind] : undefined }
+  const estilo = scene && scene.estilo
+  const trocada = !!(n && n.figura) || !!(estilo && FORMAS.includes(estilo.forma))
+  return { estilo, padrao: 'caixa', contorno: trocada && n ? CONTORNO[n.kind] : undefined }
 }
 
 // Posições dos nós: níveis de cima para baixo, ou da esquerda para a direita com estilo.arranjo = 'horizontal'.
