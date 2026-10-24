@@ -1,6 +1,8 @@
 // Cena «camadas»: placas empilhadas (a primeira em cima), com os `items` como etiquetas sobre a placa.
 // O foco afasta as placas acima e abaixo; hops sobem ou descem entre placas.
 // Não importa three: usa stage.THREE, então as funções puras abaixo rodam em `node --test`.
+// Com estilo.arranjo = 'horizontal' as placas ficam em pé, lado a lado (a primeira, o topo, à esquerda).
+import { makePiece } from '../engine/pieces.js'
 
 const PALETTE = [0xD97757, 0x5B8DEF, 0x36C5A0, 0xE5B94E, 0xB58AE6, 0xE86A92, 0x62C7E8, 0x9AD66B]
 const GAP_Y = 2.1 // distância entre placas
@@ -13,6 +15,11 @@ const HOP_GAP_MS = 900
 const HOP_MS = 1200
 const SETTLE_MS = 800
 const EMPTY_MS = 700
+const HGAP = 3.7 // distância entre placas em pé
+const HPLATE_W = 2.8
+const HPLATE_TALL = 6.6
+const HITEM_GAP = 1.05
+const FIG_SCALE = 0.7
 const ITEM_RISE = 1.5 // o palco põe o texto ~1,2 abaixo de um grupo vazio; sobe um pouco para ficar na face da placa
 
 // Altura da placa i de n: decrescente, centrada em zero.
@@ -54,47 +61,94 @@ export function hopPlan(layerIds, hops, gapMs = HOP_GAP_MS) {
   return out
 }
 
-export function build(scene, stage) {
+// Posição da placa i de n: empilhada (y) ou em pé, lado a lado (x).
+export function layerPos(i, n, horiz) {
+  return horiz ? [(i - (n - 1) / 2) * HGAP, 0, 0] : [0, layerY(i, n), 0]
+}
+
+// Posição de cada um dos m itens em relação ao centro da placa.
+export function itemOffsets(m, horiz) {
+  if (!horiz) return itemXs(m).map((x) => [x, 0, 0])
+  const gap = Math.min(HITEM_GAP, (HPLATE_TALL - 1.8) / Math.max(m, 1))
+  return Array.from({ length: m }, (_, k) => [0, ((m - 1) / 2 - k) * gap, 0])
+}
+
+// O deslocamento `o` de spreadOffsets (positivo = placas «antes») como vetor [dx, dy]: para cima, ou para a esquerda se em pé.
+export function spreadVec(o, horiz) {
+  return horiz ? [o ? -o : 0, 0] : [0, o]
+}
+
+// Ponto de partida/chegada dos pacotes junto à placa i: à direita da placa empilhada, ou no alto da placa em pé.
+export function hopAnchor(i, n, horiz) {
+  return horiz ? [layerPos(i, n, true)[0], HPLATE_TALL / 2 + 0.5, 0] : [HOP_X, layerY(i, n), 0]
+}
+
+// Onde a figura da placa fica em relação ao centro dela.
+export function figureOffset(horiz) {
+  return horiz ? [0, HPLATE_TALL / 2 - 0.95, PLATE_D / 2 + 0.25] : [-PLATE_W / 2 + 0.95, 0, PLATE_D / 2 + 0.25]
+}
+
+export async function build(scene, stage) {
   const { THREE } = stage
+  const horiz = !!(scene.estilo && scene.estilo.arranjo === 'horizontal')
   const layers = (Array.isArray(scene.layers) ? scene.layers : []).filter((l) => l && typeof l === 'object')
   const n = layers.length
   const ids = layers.map((l) => String(l.id))
   const pieces = new Map()
-  const entries = [] // { id, group, base, items: [{ group, x, key }] , cur, want }
+  const entries = [] // { id, group, base, chips: [{ group, off, key }], fig, cur, want }
+  const plateSize = horiz ? [HPLATE_W, HPLATE_TALL, PLATE_D] : [PLATE_W, PLATE_H, PLATE_D]
+  const figs = await Promise.all(layers.map((l) => (l.figura ? makePiece(stage, l, { estilo: scene.estilo, padrao: 'caixa', cor: PALETTE[layers.indexOf(l) % PALETTE.length] }) : null)))
 
   layers.forEach((l, i) => {
     const color = PALETTE[i % PALETTE.length]
     const mat = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.15, roughness: 0.4, metalness: 0.2 })
     const g = new THREE.Group()
-    g.add(new THREE.Mesh(new THREE.BoxGeometry(PLATE_W, PLATE_H, PLATE_D), mat))
-    const base = layerY(i, n)
-    g.position.set(0, base, 0)
+    g.add(new THREE.Mesh(new THREE.BoxGeometry(...plateSize), mat))
+    const base = layerPos(i, n, horiz)
+    g.position.set(...base)
     stage.addPiece(ids[i], g, { label: l.label ?? l.id, detail: l.detail, color })
     pieces.set(ids[i], g)
     const items = Array.isArray(l.items) ? l.items : []
-    const xs = itemXs(items.length)
+    const offs = itemOffsets(items.length, horiz)
     const chips = items.map((text, k) => {
       const key = `__item:${ids[i]}:${k}`
       const cg = new THREE.Group()
-      cg.position.set(xs[k], base + ITEM_RISE + 0.05, PLATE_D / 2 + 0.1)
+      cg.position.set(base[0] + offs[k][0], base[1] + offs[k][1] + ITEM_RISE + 0.05, PLATE_D / 2 + 0.1)
       stage.addPiece(key, cg, { label: String(text) })
-      return { group: cg, x: xs[k], key }
+      return { group: cg, off: offs[k], key }
     })
-    entries.push({ id: ids[i], group: g, base, chips, cur: 0, want: 0 })
+    let fig = null
+    if (figs[i]) {
+      const fo = figureOffset(horiz)
+      figs[i].scale.setScalar(FIG_SCALE)
+      figs[i].position.set(base[0] + fo[0], base[1] + fo[1], fo[2])
+      stage.addPiece(`__fig:${ids[i]}`, figs[i], {})
+      fig = { group: figs[i], off: fo, key: `__fig:${ids[i]}` }
+    }
+    entries.push({ id: ids[i], group: g, base, chips, fig, cur: 0, want: 0 })
   })
 
   const off = stage.onFrame(() => {
     for (const e of entries) {
       e.cur += (e.want - e.cur) * 0.1
-      e.group.position.y = e.base + e.cur
-      for (const c of e.chips) c.group.position.y = e.base + e.cur + ITEM_RISE + 0.05
+      const [dx, dy] = spreadVec(e.cur, horiz)
+      e.group.position.set(e.base[0] + dx, e.base[1] + dy, 0)
+      for (const c of e.chips) c.group.position.set(e.base[0] + dx + c.off[0], e.base[1] + dy + c.off[1] + ITEM_RISE + 0.05, PLATE_D / 2 + 0.1)
+      if (e.fig) e.fig.group.position.set(e.base[0] + dx + e.fig.off[0], e.base[1] + dy + e.fig.off[1], e.fig.off[2])
     }
   })
 
   const box = new THREE.Box3()
   if (n) {
-    box.expandByPoint(new THREE.Vector3(-PLATE_W / 2 - 0.6, layerY(n - 1, n) - SPREAD - 1.3, -PLATE_D / 2))
-    box.expandByPoint(new THREE.Vector3(PLATE_W / 2 + 0.6, layerY(0, n) + SPREAD + 0.8, PLATE_D / 2))
+    const first = layerPos(0, n, horiz)
+    const last = layerPos(n - 1, n, horiz)
+    if (horiz) {
+      box.expandByPoint(new THREE.Vector3(first[0] - HPLATE_W / 2 - SPREAD - 0.6, -HPLATE_TALL / 2 - 1.5, -PLATE_D / 2))
+      box.expandByPoint(new THREE.Vector3(last[0] + HPLATE_W / 2 + SPREAD + 0.6, HPLATE_TALL / 2 + 1.1, PLATE_D / 2))
+    } else {
+      box.expandByPoint(new THREE.Vector3(-PLATE_W / 2 - 0.6, last[1] - SPREAD - 1.3, -PLATE_D / 2))
+      box.expandByPoint(new THREE.Vector3(PLATE_W / 2 + 0.6, first[1] + SPREAD + 0.8, PLATE_D / 2))
+    }
     stage.fit(box)
   }
 
@@ -105,7 +159,7 @@ export function build(scene, stage) {
       const offs = spreadOffsets(n, fi)
       entries.forEach((e, i) => { e.want = offs[i] })
       const lit = []
-      for (const i of fi) lit.push(ids[i], ...entries[i].chips.map((c) => c.key))
+      for (const i of fi) lit.push(ids[i], ...entries[i].chips.map((c) => c.key), ...(entries[i].fig ? [entries[i].fig.key] : []))
       const extra = (step && Array.isArray(step.focus) ? step.focus : []).map(String).filter((id) => !ids.includes(id))
       stage.focus(lit.length ? lit : extra.length ? extra : undefined)
 
@@ -113,7 +167,9 @@ export function build(scene, stage) {
       if (!plan.length) return stage.wait(fi.length ? SETTLE_MS : EMPTY_MS)
       const at = (id) => {
         const i = ids.indexOf(id)
-        return new THREE.Vector3(HOP_X, layerY(i, n) + offs[i], PLATE_D / 2 + 0.2)
+        const a = hopAnchor(i, n, horiz)
+        const [dx, dy] = spreadVec(offs[i], horiz)
+        return new THREE.Vector3(a[0] + dx, a[1] + dy, PLATE_D / 2 + 0.2)
       }
       const runs = plan.map((h) => stage.packet(at(h.from), at(h.to), { color: PALETTE[ids.indexOf(h.from) % PALETTE.length], arc: 0.35, delayMs: h.delayMs, ms: HOP_MS }))
       await Promise.all(runs)

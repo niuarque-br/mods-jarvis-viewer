@@ -152,10 +152,14 @@ async function load(item, event) {
   let built
   try {
     if (!stage) throw new Error('sem 3D')
-    built = mod.build(scene, stage)
+    built = await mod.build(scene, stage) // as figuras carregam aqui; build pode ser síncrona ou assíncrona
   } catch (e) {
     console.error(e)
     return loadFailed(`Não consegui montar a cena «${scene.title || type}».`)
+  }
+  if (seq !== loadSeq) { // outra cena chegou enquanto as figuras carregavam: esta já não vale
+    try { built.dispose() } catch (e) { console.error(e) }
+    return
   }
   current = { id: item.id, scene, mod, built }
   const steps = Array.isArray(scene.steps) ? scene.steps : []

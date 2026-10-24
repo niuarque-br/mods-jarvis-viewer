@@ -86,7 +86,9 @@ export function estadoDoNivel(level) {
   return l > 0.8 ? 'foco' : l < 0.2 ? 'apagada' : 'normal'
 }
 
-export async function makePiece(stage, peca, { estilo, padrao, cor, contorno } = {}) {
+// `desenho`: fábrica () => Object3D com o visual de hoje do tipo de cena (quando não há figura nem estilo.forma, e na
+// queda de uma figura que não carrega). Sem ela, o padrão do tipo sai de makeShape.
+export async function makePiece(stage, peca, { estilo, padrao, cor, contorno, desenho } = {}) {
   const { THREE } = stage
   const choice = escolherForma(peca, estilo, padrao)
   const outer = new THREE.Group() // o stage escala e posiciona este grupo
@@ -111,8 +113,13 @@ export async function makePiece(stage, peca, { estilo, padrao, cor, contorno } =
     }
   }
   if (!plane) {
-    const forma = choice.kind === 'forma' ? choice.forma : FORMAS.includes(padrao) ? padrao : 'caixa'
-    shape = makeShape(THREE, forma, color)
+    const pedida = choice.kind === 'forma' && estilo && FORMAS.includes(estilo.forma)
+    if (typeof desenho === 'function' && !pedida) {
+      shape = { group: desenho(), spinners: [] }
+    } else {
+      const forma = choice.kind === 'forma' ? choice.forma : FORMAS.includes(padrao) ? padrao : 'caixa'
+      shape = makeShape(THREE, forma, color)
+    }
     inner.add(shape.group)
   }
   if (contorno === 'pilula' || contorno === 'losango') {

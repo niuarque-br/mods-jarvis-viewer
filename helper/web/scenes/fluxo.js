@@ -1,7 +1,8 @@
 // Cena «fluxo»: nós em camadas; início/fim são pílulas, decisão é losango. O marcador percorre o `path` do passo
 // e as arestas rotuladas mostram o rótulo quando o marcador passa. Câmera de frente (planar).
 // Não importa three: usa stage.THREE, então as funções puras abaixo rodam em `node --test`.
-import { layered } from '../engine/layout.js'
+import { layered, arrange } from '../engine/layout.js'
+import { makePiece } from '../engine/pieces.js'
 import { pathEdges, lastStop, markerPos, createMarker, addArrowHead } from '../engine/flowkit.js'
 
 export { pathEdges, lastStop, markerPos }
@@ -16,7 +17,12 @@ const LIT = 0.9
 
 // Deslocamento [dx, dy] do ponto de controle da aresta a→b: descida de um nível é reta;
 // retorno (sobe ou mesma fila) e salto de vários níveis contornam a fila.
-export function flowBend(a, b) {
+// Com `horizontal` (níveis em x crescente) o cálculo é o mesmo num quadro girado: descer vira ir para a direita.
+export function flowBend(a, b, horizontal = false) {
+  if (horizontal) {
+    const [bx, by] = flowBend([-a[1] * 1.33, -a[0] * 0.565], [-b[1] * 1.33, -b[0] * 0.565])
+    return [by ? -by : 0, bx ? -bx : 0]
+  }
   const dy = b[1] - a[1]
   const dx = b[0] - a[0]
   if (dy > 0.1) return [2.2, 0] // sobe: laço de retorno
@@ -25,28 +31,49 @@ export function flowBend(a, b) {
   return [0, 0]
 }
 
-export function build(scene, stage) {
+const CONTORNO = { inicio: 'pilula', fim: 'pilula', decisao: 'losango' }
+
+// Opções da peça de um nó. O contorno da forma original só entra quando o nó é desenhado por uma figura.
+export function pieceOptions(n, scene) {
+  return { estilo: scene && scene.estilo, padrao: 'caixa', contorno: n && n.figura ? CONTORNO[n.kind] : undefined }
+}
+
+// Posições dos nós: níveis de cima para baixo, ou da esquerda para a direita com estilo.arranjo = 'horizontal'.
+export function flowPositions(nodes, edges, estilo) {
+  return arrange(layered(nodes, edges), estilo)
+}
+
+// O desenho de hoje do nó (usado sem figura nem estilo.forma, e quando a figura não carrega).
+function legacyMesh(THREE, n, color) {
+  const mat = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.15, roughness: 0.35, metalness: 0.2 })
+  let mesh
+  if (n.kind === 'inicio' || n.kind === 'fim') {
+    mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 0.95, 8, 24), mat)
+    mesh.rotation.z = Math.PI / 2
+  } else if (n.kind === 'decisao') {
+    mesh = new THREE.Mesh(new THREE.BoxGeometry(1.25, 1.25, 0.5), mat)
+    mesh.rotation.z = Math.PI / 4
+  } else mesh = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.0, 0.5), mat)
+  const g = new THREE.Group()
+  g.add(mesh)
+  return g
+}
+
+export async function build(scene, stage) {
   const { THREE } = stage
   const nodes = Array.isArray(scene.nodes) ? scene.nodes : []
   const edges = Array.isArray(scene.edges) ? scene.edges : []
   const steps = Array.isArray(scene.steps) ? scene.steps : []
-  const pos = layered(nodes, edges)
+  const horiz = !!(scene.estilo && scene.estilo.arranjo === 'horizontal')
+  const pos = flowPositions(nodes, edges, scene.estilo)
   const vec = new Map([...pos].map(([id, p]) => [id, new THREE.Vector3(...p)]))
 
   const pieces = new Map()
-  nodes.forEach((n) => {
-    const color = COLORS[n.kind] ?? COLORS.etapa
-    const mat = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.15, roughness: 0.35, metalness: 0.2 })
-    let mesh
-    if (n.kind === 'inicio' || n.kind === 'fim') {
-      mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 0.95, 8, 24), mat)
-      mesh.rotation.z = Math.PI / 2
-    } else if (n.kind === 'decisao') {
-      mesh = new THREE.Mesh(new THREE.BoxGeometry(1.25, 1.25, 0.5), mat)
-      mesh.rotation.z = Math.PI / 4
-    } else mesh = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.0, 0.5), mat)
-    const g = new THREE.Group()
-    g.add(mesh)
+  const cores = nodes.map((n) => COLORS[n.kind] ?? COLORS.etapa)
+  const made = await Promise.all(nodes.map((n, i) => makePiece(stage, n, { ...pieceOptions(n, scene), cor: cores[i], desenho: () => legacyMesh(THREE, n, cores[i]) })))
+  nodes.forEach((n, i) => {
+    const color = cores[i]
+    const g = made[i]
     g.position.copy(vec.get(n.id))
     stage.addPiece(n.id, g, { label: n.label, detail: n.detail, color })
     pieces.set(n.id, g)
@@ -59,7 +86,7 @@ export function build(scene, stage) {
     const A = vec.get(e.from)
     const B = vec.get(e.to)
     if (edgeInfo.has(key) || e.from === e.to || !A || !B) continue
-    const [bx, by] = flowBend([A.x, A.y, 0], [B.x, B.y, 0])
+    const [bx, by] = flowBend([A.x, A.y, 0], [B.x, B.y, 0], horiz)
     const curve = bx || by
       ? new THREE.QuadraticBezierCurve3(A.clone(), A.clone().add(B).multiplyScalar(0.5).add(new THREE.Vector3(bx, by, 0)), B.clone())
       : new THREE.LineCurve3(A.clone(), B.clone())

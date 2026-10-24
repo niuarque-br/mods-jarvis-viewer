@@ -2,6 +2,7 @@
 // no estado `initial`. O marcador pula pelo `path` do passo. Câmera de frente (planar).
 // Não importa three: usa stage.THREE, então as funções puras abaixo rodam em `node --test`.
 import { pathEdges, lastStop, createMarker, addArrowHead } from '../engine/flowkit.js'
+import { makePiece } from '../engine/pieces.js'
 
 export { pathEdges }
 
@@ -48,7 +49,12 @@ export function entryArrow(p) {
   ]
 }
 
-export function build(scene, stage) {
+// O estado de hoje é um disco (cilindro de frente para a câmera).
+export function pieceOptions(s, scene) {
+  return { estilo: scene && scene.estilo, padrao: 'cilindro' }
+}
+
+export async function build(scene, stage) {
   const { THREE } = stage
   const states = Array.isArray(scene.states) ? scene.states : []
   const transitions = Array.isArray(scene.transitions) ? scene.transitions : []
@@ -58,15 +64,23 @@ export function build(scene, stage) {
 
   const pieces = new Map()
   const colors = new Map()
-  states.forEach((s, i) => {
+  const cores = states.map((s, i) => {
     const c = PALETTE[i % PALETTE.length]
-    const color = stage.theme === 'light' && c === 0xE8ECF3 ? 0x6B7280 : c
-    colors.set(s.id, color)
+    return stage.theme === 'light' && c === 0xE8ECF3 ? 0x6B7280 : c
+  })
+  const legacy = (color) => () => {
     const mat = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.15, roughness: 0.35, metalness: 0.2 })
     const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.3, 48), mat)
     disc.rotation.x = Math.PI / 2 // disco de frente para a câmera
     const g = new THREE.Group()
     g.add(disc)
+    return g
+  }
+  const made = await Promise.all(states.map((s, i) => makePiece(stage, s, { ...pieceOptions(s, scene), cor: cores[i], desenho: legacy(cores[i]) })))
+  states.forEach((s, i) => {
+    const color = cores[i]
+    colors.set(s.id, color)
+    const g = made[i]
     g.position.copy(vec.get(s.id))
     stage.addPiece(s.id, g, { label: s.label, detail: s.detail, color })
     pieces.set(s.id, g)

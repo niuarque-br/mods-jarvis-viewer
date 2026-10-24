@@ -33,3 +33,19 @@ test('depthOf e growDelay: ramos mais fundos brotam depois', () => {
   assert.ok(growDelay(2) > growDelay(1))
   assert.equal(growDelay(1), 0)
 })
+
+import { pieceOptions as treePiece, treePositions } from '../scenes/arvore.js'
+
+test('árvore horizontal: raiz à esquerda e x cresce com a profundidade', () => {
+  const h = treePositions(nodes, { arranjo: 'horizontal' })
+  assert.ok(h.get('r')[0] < h.get('a')[0] && h.get('a')[0] < h.get('b')[0])
+  assert.equal(h.get('a')[0], h.get('c')[0])
+  const v = treePositions(nodes, undefined)
+  assert.ok(v.get('r')[1] > v.get('a')[1])
+})
+
+test('árvore: padrão esfera, estilo.forma e figura respeitados', () => {
+  const o = treePiece({}, { estilo: { forma: 'caixa' } })
+  assert.equal(o.padrao, 'esfera')
+  assert.equal(o.estilo.forma, 'caixa')
+})

@@ -147,3 +147,20 @@ export function tree(nodes) {
   for (const [id, p] of pos) pos.set(id, [p[0] - cx, p[1] - cy, 0])
   return pos
 }
+
+// Arranjo horizontal: gira um layout vertical (níveis em y decrescente) para níveis em x crescente.
+// A raiz/primeiro nível fica à esquerda; a ordem dentro do nível vira de cima para baixo.
+export function horizontal(pos, { levelGap = 4.6, siblingGap = 2.4 } = {}) {
+  const out = new Map()
+  for (const [id, p] of pos) out.set(id, [(-p[1] / GAP_Y) * levelGap, (-p[0] / GAP_X) * siblingGap, 0])
+  const b = bounds([...out.values()])
+  const cx = (b.min[0] + b.max[0]) / 2
+  const cy = (b.min[1] + b.max[1]) / 2
+  for (const [id, p] of out) out.set(id, [p[0] - cx, p[1] - cy, 0])
+  return out
+}
+
+// Aplica o `estilo.arranjo` da cena a um layout vertical; qualquer outro valor deixa como está.
+export function arrange(pos, estilo) {
+  return estilo && estilo.arranjo === 'horizontal' ? horizontal(pos) : pos
+}

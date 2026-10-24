@@ -40,3 +40,11 @@ test('entryArrow aponta de fora do anel para o estado', () => {
   const solo = entryArrow([0, 0, 0])
   assert.ok(solo[0].every(Number.isFinite))
 })
+
+import { pieceOptions as stPiece } from '../scenes/estados.js'
+
+test('estados: estado usa o padrão cilindro (disco) e repassa estilo', () => {
+  const o = stPiece({ id: 's' }, { estilo: { forma: 'orbe' } })
+  assert.equal(o.padrao, 'cilindro')
+  assert.equal(o.estilo.forma, 'orbe')
+})

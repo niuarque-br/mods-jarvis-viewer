@@ -2,7 +2,7 @@
 // arcos de ida em cima e de volta embaixo, e cada hop vira um pacote com rastro.
 // Não importa three: usa stage.THREE, então as funções puras abaixo rodam em `node --test`.
 import { row, layered } from '../engine/layout.js'
-import { makeShape } from '../engine/pieces.js'
+import { makePiece } from '../engine/pieces.js'
 
 const PALETTE = [0xD97757, 0x5B8DEF, 0x36C5A0, 0xE8ECF3, 0xE5B94E, 0xB58AE6, 0xE86A92, 0x62C7E8]
 const HOP_GAP_MS = 900
@@ -50,7 +50,13 @@ export function hopPlan(positions, hops, gapMs = HOP_GAP_MS) {
   return out
 }
 
-export function build(scene, stage) {
+// Opções da peça de um nó: a `shape` do próprio nó vale mais que a `estilo.forma` da cena; a figura vale mais que as duas.
+export function pieceOptions(n, scene) {
+  const estilo = n && n.shape ? { ...(scene && scene.estilo), forma: n.shape } : scene && scene.estilo
+  return { estilo, padrao: 'caixa' }
+}
+
+export async function build(scene, stage) {
   const { THREE } = stage
   const nodes = Array.isArray(scene.nodes) ? scene.nodes : []
   const links = Array.isArray(scene.links) ? scene.links : []
@@ -70,14 +76,13 @@ export function build(scene, stage) {
   }
 
   const pieces = new Map()
-  const spinners = []
   const colors = new Map()
+  const cores = nodes.map((n, i) => colorOf(n, i))
+  const made = await Promise.all(nodes.map((n, i) => makePiece(stage, n, { ...pieceOptions(n, scene), cor: cores[i] })))
   nodes.forEach((n, i) => {
-    const color = colorOf(n, i)
+    const color = cores[i]
     colors.set(n.id, color)
-    const shape = makeShape(THREE, n.shape || 'caixa', color)
-    const g = shape.group
-    spinners.push(...shape.spinners)
+    const g = made[i]
     g.position.copy(vec.get(n.id))
     stage.addPiece(n.id, g, { label: n.label, sub: n.sub, detail: n.detail, color })
     pieces.set(n.id, g)
@@ -105,7 +110,6 @@ export function build(scene, stage) {
 
   const off = stage.onFrame(() => {
     const now = stage.now()
-    for (const s of spinners) { s.o.rotation.y += s.ry; s.o.rotation.x += s.rx }
     for (const t of tubes.values()) t.mat.opacity += ((now < t.until ? 0.85 : 0.18) - t.mat.opacity) * 0.1
   })
 

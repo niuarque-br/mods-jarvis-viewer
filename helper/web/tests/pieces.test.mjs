@@ -105,3 +105,13 @@ test('makePiece: malhas opacas da forma não viram transparentes sem motivo', as
   obj.userData.level = 1
   for (let i = 0; i < 1; i++) stage.tick()
 })
+
+test('makePiece: desenho de hoje vale sem estilo.forma e na queda da figura; estilo.forma o substitui', async () => {
+  clearFigureCache()
+  globalThis.fetch = async () => ({ ok: false, status: 404 })
+  const marca = () => { const g = new THREE.Group(); g.userData.marca = true; g.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial())); return g }
+  const achou = (o) => { let f = false; o.traverse((c) => { if (c.userData.marca) f = true }); return f }
+  assert.ok(achou(await makePiece(fakeStage(), {}, { padrao: 'esfera', desenho: marca })))
+  assert.ok(achou(await makePiece(fakeStage(), { figura: 'x/y:z' }, { padrao: 'esfera', desenho: marca })))
+  assert.ok(!achou(await makePiece(fakeStage(), {}, { estilo: { forma: 'caixa' }, padrao: 'esfera', desenho: marca })))
+})

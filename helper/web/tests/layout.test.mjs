@@ -93,3 +93,22 @@ test('safeBounds: vazio ou não finito devolve a caixa padrão', () => {
   }
   assert.deepEqual(safeBounds([[1, 2, 3], [-1, 5, 0], [NaN, 0, 0]]), { min: [-1, 2, 0], max: [1, 5, 3] })
 })
+
+import { horizontal, arrange, tree as _tree, layered as _layered } from '../engine/layout.js'
+
+test('horizontal: níveis crescem em x, irmãos se espalham em y (primeiro em cima)', () => {
+  const nodes = [{ id: 'r' }, { id: 'a', parent: 'r' }, { id: 'b', parent: 'r' }, { id: 'c', parent: 'a' }]
+  const h = horizontal(_tree(nodes))
+  assert.ok(h.get('r')[0] < h.get('a')[0] && h.get('a')[0] < h.get('c')[0])
+  assert.equal(h.get('a')[0], h.get('b')[0])
+  assert.ok(h.get('a')[1] > h.get('b')[1]) // a vem antes e fica acima
+  assert.ok(Math.abs(h.get('r')[0] + h.get('c')[0]) < 1e-9) // centrado
+})
+
+test('arrange: só horizontal gira; padrão e vertical devolvem o mesmo layout', () => {
+  const pos = _layered(['a', 'b'], [['a', 'b']])
+  assert.equal(arrange(pos, undefined), pos)
+  assert.equal(arrange(pos, { arranjo: 'vertical' }), pos)
+  const h = arrange(pos, { arranjo: 'horizontal' })
+  assert.ok(h.get('a')[0] < h.get('b')[0])
+})

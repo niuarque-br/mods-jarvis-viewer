@@ -1,6 +1,7 @@
 // Cena «sequencia»: atores em colunas com linha de vida; mensagens são setas horizontais em descida.
 // A mensagem destacada aparece e manda um pacote. Câmera de frente (planar).
 import { row } from '../engine/layout.js'
+import { makePiece } from '../engine/pieces.js'
 
 const PALETTE = [0xD97757, 0x5B8DEF, 0x36C5A0, 0xE8ECF3, 0xE5B94E, 0xB58AE6, 0xE86A92, 0x62C7E8]
 const TOP_Y = -2.0 // primeira mensagem
@@ -27,7 +28,11 @@ export function revealedBy(steps, i) {
   return out
 }
 
-export function build(scene, stage) {
+export function pieceOptions(a, scene) {
+  return { estilo: scene && scene.estilo, padrao: 'caixa' }
+}
+
+export async function build(scene, stage) {
   const { THREE } = stage
   const actors = Array.isArray(scene.actors) ? scene.actors : []
   const messages = Array.isArray(scene.messages) ? scene.messages : []
@@ -41,11 +46,16 @@ export function build(scene, stage) {
   const bottom = sequenceY(Math.max(messages.length - 1, 0)) - 1.0
 
   const pieces = new Map()
-  actors.forEach((a) => {
-    const color = colors.get(a.id)
+  const legacy = (color) => () => {
     const mat = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.15, roughness: 0.35, metalness: 0.2 })
     const g = new THREE.Group()
     g.add(new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.7, 0.5), mat))
+    return g
+  }
+  const made = await Promise.all(actors.map((a) => makePiece(stage, a, { ...pieceOptions(a, scene), cor: colors.get(a.id), desenho: legacy(colors.get(a.id)) })))
+  actors.forEach((a, ai) => {
+    const color = colors.get(a.id)
+    const g = made[ai]
     g.position.set(ax.get(a.id), 0, 0)
     stage.addPiece(a.id, g, { label: a.label, detail: a.detail, color })
     pieces.set(a.id, g)

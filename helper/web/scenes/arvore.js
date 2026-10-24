@@ -1,7 +1,8 @@
 // Cena «arvore»: layout tree(); no primeiro passo os ramos brotam da raiz (mais fundos depois);
 // `highlight` acende o caminho da raiz até o nó e manda pacotes descendo por ele. Câmera de frente (planar).
 // Não importa three: usa stage.THREE, então as funções puras abaixo rodam em `node --test`.
-import { tree } from '../engine/layout.js'
+import { tree, arrange } from '../engine/layout.js'
+import { makePiece } from '../engine/pieces.js'
 import { pathEdges } from '../engine/flowkit.js'
 
 export { pathEdges }
@@ -42,20 +43,35 @@ export function growDelay(depth) {
   return Math.max(0, depth - 1) * GROW_STEP_MS
 }
 
-export function build(scene, stage) {
+export function pieceOptions(n, scene) {
+  return { estilo: scene && scene.estilo, padrao: 'esfera' }
+}
+
+// Posições dos nós: filhos sob o pai, ou à direita dele com estilo.arranjo = 'horizontal'.
+export function treePositions(nodes, estilo) {
+  return arrange(tree(nodes), estilo)
+}
+
+export async function build(scene, stage) {
   const { THREE } = stage
   const nodes = Array.isArray(scene.nodes) ? scene.nodes : []
-  const pos = tree(nodes)
+  const horiz = !!(scene.estilo && scene.estilo.arranjo === 'horizontal')
+  const pos = treePositions(nodes, scene.estilo)
   const vec = new Map([...pos].map(([id, p]) => [id, new THREE.Vector3(...p)]))
   const depth = new Map(nodes.map((n) => [n.id, depthOf(nodes, n.id)]))
 
   const pieces = new Map()
-  nodes.forEach((n) => {
-    const d = depth.get(n.id)
-    const color = PALETTE[d % PALETTE.length]
+  const cores = nodes.map((n) => PALETTE[depth.get(n.id) % PALETTE.length])
+  const legacy = (d, color) => () => {
     const mat = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.15, roughness: 0.35, metalness: 0.2 })
     const g = new THREE.Group()
     g.add(new THREE.Mesh(new THREE.SphereGeometry(d === 0 ? 0.75 : 0.55, 40, 40), mat))
+    return g
+  }
+  const made = await Promise.all(nodes.map((n, i) => makePiece(stage, n, { ...pieceOptions(n, scene), cor: cores[i], desenho: legacy(depth.get(n.id), cores[i]) })))
+  nodes.forEach((n, i) => {
+    const color = cores[i]
+    const g = made[i]
     g.position.copy(vec.get(n.id))
     stage.addPiece(n.id, g, { label: n.label, detail: n.detail, color })
     pieces.set(n.id, g)
@@ -67,7 +83,7 @@ export function build(scene, stage) {
     const A = vec.get(n.parent)
     const B = vec.get(n.id)
     if (n.parent === undefined || !A || !B || branches.has(n.parent + '>' + n.id)) continue
-    const curve = new THREE.QuadraticBezierCurve3(A.clone(), new THREE.Vector3(A.x, (A.y + B.y) / 2 + 0.2, 0), B.clone())
+    const curve = new THREE.QuadraticBezierCurve3(A.clone(), (horiz ? new THREE.Vector3((A.x + B.x) / 2 + 0.2, A.y, 0) : new THREE.Vector3(A.x, (A.y + B.y) / 2 + 0.2, 0)), B.clone())
     const geo = new THREE.TubeGeometry(curve, 24, 0.04, 8)
     const mat = new THREE.MeshBasicMaterial({ color: stage.tubeColor, transparent: true, opacity: DIM })
     stage.scene.add(new THREE.Mesh(geo, mat))

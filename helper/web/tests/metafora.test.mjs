@@ -89,3 +89,11 @@ test('particleOffsets: 200 pontos dentro do raio, sempre os mesmos', () => {
   assert.deepEqual([...particleOffsets(200, 2, 7)], [...a])
   assert.notDeepEqual([...particleOffsets(200, 2, 8)], [...a])
 })
+
+import { usesFigure } from '../scenes/metafora.js'
+
+test('metáfora: shape figura com nome usa figura; sem nome cai nas primitivas', () => {
+  assert.equal(usesFigure({ shape: 'figura', figura: 'a/b:c' }), true)
+  assert.equal(usesFigure({ shape: 'figura' }), false)
+  assert.equal(usesFigure({ shape: 'caixa', figura: 'a/b:c' }), false)
+})

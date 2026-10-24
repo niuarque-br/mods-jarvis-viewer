@@ -54,3 +54,10 @@ test('valores pequenos mantêm as casas da escala (0,004 não vira "0")', () => 
   assert.equal(valueText('rápido', 2), 'rápido')
   assert.equal(valueText(undefined, 2), undefined)
 })
+
+import { figureX } from '../scenes/comparacao.js'
+
+test('comparação: a figura do item fica à esquerda da trilha, pequena', () => {
+  assert.ok(figureX(-3.5) < -3.5 - 2.5)
+  assert.ok(figureX(3.5) < 3.5 - 2.5)
+})

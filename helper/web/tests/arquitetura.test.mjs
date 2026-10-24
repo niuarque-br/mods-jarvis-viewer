@@ -41,3 +41,16 @@ test('hops numa aresta inexistente ainda animam; id desconhecido é ignorado', (
   assert.deepEqual(plan.map((h) => Math.sign(h.arc)), [1, -1, -1])
   assert.deepEqual(plan.map((h) => h.delayMs), [0, 900, 3 * 900])
 })
+
+import { pieceOptions as archPiece } from '../scenes/arquitetura.js'
+import { escolherForma as escolher } from '../engine/pieces.js'
+
+test('arquitetura: figura > shape do nó > estilo.forma da cena > caixa', () => {
+  const sc = { estilo: { forma: 'esfera' } }
+  const o = (n) => archPiece(n, sc)
+  assert.equal(escolher({ figura: 'a/b:c' }, o({}).estilo, o({}).padrao).kind, 'figura')
+  assert.deepEqual(escolher({ shape: 'cilindro' }, o({ shape: 'cilindro' }).estilo, o({ shape: 'cilindro' }).padrao), { kind: 'forma', forma: 'cilindro' })
+  assert.deepEqual(escolher({}, o({}).estilo, o({}).padrao), { kind: 'forma', forma: 'esfera' })
+  const plain = archPiece({}, {})
+  assert.deepEqual(escolher({}, plain.estilo, plain.padrao), { kind: 'forma', forma: 'caixa' })
+})

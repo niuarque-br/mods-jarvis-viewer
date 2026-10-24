@@ -39,3 +39,24 @@ test('itemXs centrado e dentro da placa', () => {
     assert.ok(Math.max(...xs.map(Math.abs)) < 4.5)
   }
 })
+
+import { layerPos, itemOffsets, hopAnchor, spreadVec } from '../scenes/camadas.js'
+
+test('camadas horizontal: placas lado a lado, da esquerda (topo) para a direita', () => {
+  for (let n = 1; n <= 6; n++) {
+    for (let i = 1; i < n; i++) assert.ok(layerPos(i, n, true)[0] > layerPos(i - 1, n, true)[0])
+    assert.ok(Math.abs(layerPos(0, n, true)[0] + layerPos(n - 1, n, true)[0]) < 1e-9)
+    for (let i = 0; i < n; i++) assert.equal(layerPos(i, n, true)[1], 0)
+  }
+  assert.deepEqual(layerPos(0, 3, false), [0, layerY(0, 3), 0]) // vertical como sempre
+})
+
+test('camadas horizontal: itens empilhados de cima para baixo; foco afasta no eixo x', () => {
+  const ys = itemOffsets(3, true).map((p) => p[1])
+  assert.ok(ys[0] > ys[1] && ys[1] > ys[2])
+  assert.equal(itemOffsets(3, true).every((p) => p[0] === 0), true)
+  assert.deepEqual(spreadVec(1, true), [-1, 0])   // placas «acima» (à esquerda) vão mais para a esquerda
+  assert.deepEqual(spreadVec(-1, true), [1, 0])
+  assert.deepEqual(spreadVec(1, false), [0, 1])
+  assert.ok(hopAnchor(0, 3, true)[0] === layerPos(0, 3, true)[0])
+})

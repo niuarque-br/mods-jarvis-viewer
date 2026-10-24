@@ -2,6 +2,7 @@
 // as `actions` de cada passo rodam em paralelo. Estado do passo i = estado inicial + ações dos passos 0..i-1
 // aplicadas na hora + as ações do passo i animadas (play(i) é idempotente, sem depender do passo anterior).
 // Não importa three: usa stage.THREE, então as funções puras abaixo rodam em `node --test`.
+import { makePiece } from '../engine/pieces.js'
 
 const PALETTE = [0xD97757, 0x5B8DEF, 0x36C5A0, 0xE5B94E, 0xB58AE6, 0xE86A92, 0x62C7E8, 0x9AD66B]
 export const DEFAULT_MS = 1200
@@ -119,13 +120,19 @@ const hash = (s) => {
   return h >>> 0
 }
 
-export function build(scene, stage) {
+// `shape: 'figura'` só desenha figura quando o objeto diz qual.
+export const usesFigure = (o) => !!o && o.shape === 'figura' && typeof o.figura === 'string' && o.figura.trim() !== ''
+
+const FIG_SIZE = 0.7 // o plano da figura mede 1,6; com size 1 ela fica do tamanho de uma caixa grande
+
+export async function build(scene, stage) {
   const { THREE } = stage
   const objects = (Array.isArray(scene.objects) ? scene.objects : []).filter((o) => o && typeof o === 'object' && o.id !== undefined)
   const steps = Array.isArray(scene.steps) ? scene.steps : []
   const pieces = new Map()
   const ents = new Map() // id -> { outer (do palco: posição), inner (nosso: escala e giro) }
   const box = new THREE.Box3()
+  const figObjs = await Promise.all(objects.map((o, i) => (usesFigure(o) ? makePiece(stage, o, { padrao: 'caixa', cor: colorOf(o.color, i) }) : null)))
 
   objects.forEach((o, i) => {
     const id = String(o.id)
@@ -136,6 +143,7 @@ export function build(scene, stage) {
     const inner = new THREE.Group()
     outer.add(inner)
     outer.position.set(...pos)
+    if (figObjs[i]) figObjs[i].scale.setScalar(size * FIG_SIZE)
     const mesh = (geo) =>
       new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.15, roughness: 0.4, metalness: 0.2 }))
     switch (o.shape) {
@@ -156,6 +164,9 @@ export function build(scene, stage) {
         inner.add(new THREE.Points(g, new THREE.PointsMaterial({ color, size: 0.1 * Math.max(size, 0.5) })))
         break
       }
+      case 'figura': if (figObjs[i]) { inner.add(figObjs[i]); break }
+        inner.add(mesh(new THREE.BoxGeometry(size, size, size)))
+        break
       default: // 'texto': só o rótulo HTML; uma caixa invisível dá onde clicar
         inner.add(new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.5, 0.2), new THREE.MeshBasicMaterial({ visible: false })))
     }
@@ -166,7 +177,7 @@ export function build(scene, stage) {
       color: o.shape === 'texto' ? undefined : color,
     })
     pieces.set(id, outer)
-    ents.set(id, { outer, inner })
+    ents.set(id, { outer, inner, fig: figObjs[i] })
     box.expandByPoint(new THREE.Vector3(pos[0] - size, pos[1] - size, pos[2] - size))
     box.expandByPoint(new THREE.Vector3(pos[0] + size, pos[1] + size, pos[2] + size))
   })
@@ -194,6 +205,7 @@ export function build(scene, stage) {
   let runs = [] // (nowMs) => void, uma por ação do passo corrente
   let token = 0
   const off = stage.onFrame((t, nowMs) => {
+    for (const e of ents.values()) if (e.fig) e.fig.userData.level = e.outer.userData.level // o palco escreve o foco na peça externa
     for (const r of runs) r(nowMs)
   })
 

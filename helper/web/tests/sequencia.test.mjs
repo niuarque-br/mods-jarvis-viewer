@@ -19,3 +19,11 @@ test('revealedBy acumula os highlights até o passo', () => {
   assert.deepEqual([...revealedBy(steps, 1)], ['m1'])
   assert.deepEqual([...revealedBy(steps, 2)].sort(), ['m1', 'm2', 'm3'])
 })
+
+import { pieceOptions as seqPiece } from '../scenes/sequencia.js'
+
+test('sequência: ator usa o padrão caixa e repassa estilo', () => {
+  const o = seqPiece({ id: 'a' }, { estilo: { forma: 'pessoa' } })
+  assert.equal(o.padrao, 'caixa')
+  assert.equal(o.estilo.forma, 'pessoa')
+})
