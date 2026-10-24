@@ -29,6 +29,8 @@ export type WorldOptions = {
   store?: Record<string, unknown>
   storeFails?: ('get' | 'set')[]
   surfaces?: ('desktop' | 'terminal')[]
+  /** Files under assets/figuras by name (e.g. catalogo.json); any other read, or all when `fs` is 'fail', rejects. */
+  fs?: Record<string, string> | 'fail'
   /** Runs after each command reaches the fake helper: how a test plays the page. */
   onCmd?: (cmd: Record<string, unknown>, calls: World) => void
 }
@@ -70,6 +72,11 @@ export function world(on: On, opts: WorldOptions = {}): World {
   on('command.register', async ($, e) => {
     calls.commands.push(e)
     return { value: { command: e.name } }
+  })
+  on('fs.read', async ($, e) => {
+    const name = String(e.path).split(/[\\/]/).pop() ?? ''
+    if (opts.fs === undefined || opts.fs === 'fail' || !(name in opts.fs)) throw new Error('ENOENT')
+    return { value: opts.fs[name] }
   })
   on('fs.exists', async () => ({ value: !!opts.exe }))
   on('http.fetch', async ($, e) => {

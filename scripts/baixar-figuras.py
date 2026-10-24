@@ -212,6 +212,12 @@ def escrever_catalogo(destino: Path, entradas: list, pacotes: dict) -> int:
     Path(destino).mkdir(parents=True, exist_ok=True)
     (Path(destino) / "catalogo.json").write_text(
         json.dumps(doc, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    # O plugin le arquivos de ate 4 MiB ($.fs.read): o catalogo inteiro passa disso,
+    # entao cada pacote tambem vai num arquivo proprio (catalogo-<pacote>.json).
+    for pacote in pacotes:
+        parte = {"versao": 1, "pacote": pacote, "figuras": [f for f in figuras if f["pacote"] == pacote]}
+        (Path(destino) / f"catalogo-{pacote}.json").write_text(
+            json.dumps(parte, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     return len(figuras)
 
 

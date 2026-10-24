@@ -139,7 +139,7 @@ test('a ferramenta é registrada no session.start', async ($, on) => {
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
   await clock.settle()
-  expect(calls.registered.map(t => t.name)).toEqual(['mostrar_cena'])
+  expect(calls.registered.map(t => t.name)).toEqual(['mostrar_cena', 'buscar_figura'])
   expect(calls.registered[0]!.inputSchema).toMatchObject({ type: 'object', properties: { scene: {}, replay: {}, from: {} } })
 })
 

@@ -1,5 +1,6 @@
 import type { PluginOptions, Register } from 'claude-code'
 
+import { SEM_FIGURAS, buscar, carregarCatalogo, esquecerCatalogo } from './figuras'
 import { guidance, viewerPrompt } from './guidance'
 import { startHelper } from './helper'
 import type { HelperHandle } from './helper'
@@ -12,6 +13,19 @@ import { LIMITS, SCENE_TYPES, pieceLabel, validateScene } from './scene'
 import type { Scene } from './scene'
 
 export const TOOL = 'mcp__jarvis-viewer__mostrar_cena'
+export const FIGURE_TOOL = 'mcp__jarvis-viewer__buscar_figura'
+
+export const FIGURE_DESCRIPTION = `Procura figuras (ícones e emojis) para usar nas peças de uma cena. Entrada: { termo, estilo?, limite? }. termo pode ser em português ou inglês ("banco de dados", "gear"); estilo filtra por "<pacote>/<estilo>" (ex.: fluent/3d, tabler/outline) ou só pelo pacote; limite é o número de conceitos (padrão 8). A resposta é uma lista de conceitos, cada um com as opções de estilo (nome, estilo, tom). Use o nome da opção escolhida em figura. Evite as de tom "escura": somem no tema escuro.`
+
+export const FIGURE_SCHEMA = {
+  type: 'object',
+  properties: {
+    termo: { type: 'string', description: 'O que a figura representa, em português ou inglês.' },
+    estilo: { type: 'string', description: 'Filtro opcional: "<pacote>/<estilo>" ou só o pacote.' },
+    limite: { type: 'number', description: 'Máximo de conceitos devolvidos (padrão 8).' },
+  },
+  required: ['termo'],
+}
 
 export const TOOL_DESCRIPTION = `Mostra uma explicação como cena animada (3D) no navegador embutido do app desktop, com legenda e narração passo a passo. Use quando mostrar ajuda mais do que texto: arquitetura, fluxo de um processo, comparação, evolução no tempo, números em gráfico. Para respostas curtas, siga só com texto.
 
@@ -73,6 +87,7 @@ export const register: Register = (on, options: PluginOptions) => {
     await stopLoop()
     await shutdown()
     lastScene = null
+    esquecerCatalogo()
     counter = 0
     link = undefined
     sceneNarrator = undefined
@@ -81,6 +96,7 @@ export const register: Register = (on, options: PluginOptions) => {
     mainTurn = undefined
     picks = new PickQueue()
     await $.tool.register({ name: 'mostrar_cena', description: TOOL_DESCRIPTION, inputSchema: TOOL_SCHEMA, isDeferred: false })
+    await $.tool.register({ name: 'buscar_figura', description: FIGURE_DESCRIPTION, inputSchema: FIGURE_SCHEMA, isDeferred: false })
     await $.command.register({ name: 'viewer', description: 'Mostra no viewer a explicação anterior ou um assunto' })
     return next(e)
   })
@@ -152,6 +168,16 @@ export const register: Register = (on, options: PluginOptions) => {
     link?.modeChanged(e.value)
     if (e.value === 'on') $.clock.after(0, () => void jarvisTookOver($, options))
     return result
+  })
+
+  on('tool.call', { tool: FIGURE_TOOL }, async ($, e) => {
+    const termo = e.termo
+    if (typeof termo !== 'string' || termo.trim() === '') return { deny: 'Informe termo (texto).' }
+    const cat = await carregarCatalogo($)
+    if (!cat) return { deny: SEM_FIGURAS }
+    const estilo = typeof e.estilo === 'string' && e.estilo.trim() !== '' ? e.estilo : undefined
+    const limite = typeof e.limite === 'number' && Number.isFinite(e.limite) ? e.limite : undefined
+    return { result: JSON.stringify(buscar(cat, termo, { estilo, limite })) }
   })
 
   on('tool.call', { tool: TOOL }, async ($, e) => {
