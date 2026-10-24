@@ -2,6 +2,7 @@
 // arcos de ida em cima e de volta embaixo, e cada hop vira um pacote com rastro.
 // Não importa three: usa stage.THREE, então as funções puras abaixo rodam em `node --test`.
 import { row, layered } from '../engine/layout.js'
+import { makeShape } from '../engine/pieces.js'
 
 const PALETTE = [0xD97757, 0x5B8DEF, 0x36C5A0, 0xE8ECF3, 0xE5B94E, 0xB58AE6, 0xE86A92, 0x62C7E8]
 const HOP_GAP_MS = 900
@@ -74,31 +75,10 @@ export function build(scene, stage) {
   nodes.forEach((n, i) => {
     const color = colorOf(n, i)
     colors.set(n.id, color)
-    const mat = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.15, roughness: 0.35, metalness: 0.2 })
-    const g = new THREE.Group()
-    const shape = n.shape || 'caixa'
-    let mesh
-    if (shape === 'esfera') mesh = new THREE.Mesh(new THREE.SphereGeometry(0.8, 40, 40), mat)
-    else if (shape === 'octaedro') mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.85), mat)
-    else if (shape === 'cilindro') mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 1.2, 40), mat)
-    else if (shape === 'orbe') {
-      mesh = new THREE.Mesh(new THREE.SphereGeometry(0.75, 48, 48), mat)
-      const cage = new THREE.Mesh(
-        new THREE.IcosahedronGeometry(1.05, 1),
-        new THREE.MeshBasicMaterial({ color, wireframe: true, transparent: true, opacity: 0.35 }),
-      )
-      g.add(cage)
-      spinners.push({ o: cage, ry: 0, rx: 0.004 })
-    } else if (shape === 'pessoa') {
-      mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 0.6, 8, 24), mat)
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 32, 32), mat)
-      head.position.y = 0.95
-      g.add(head)
-      mesh.position.y = -0.2
-    } else mesh = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.15, 1.15), mat)
-    g.add(mesh)
+    const shape = makeShape(THREE, n.shape || 'caixa', color)
+    const g = shape.group
+    spinners.push(...shape.spinners)
     g.position.copy(vec.get(n.id))
-    spinners.push({ o: g, ry: shape === 'octaedro' ? 0.012 : 0.003, rx: 0 })
     stage.addPiece(n.id, g, { label: n.label, sub: n.sub, detail: n.detail, color })
     pieces.set(n.id, g)
   })
