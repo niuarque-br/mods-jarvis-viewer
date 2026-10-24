@@ -8,3 +8,7 @@ __pycache__/
 *.log
 .claude/
 .superpowers/
+
+assets/figuras/
+assets/figuras.tmp/
+assets/figuras.old/
