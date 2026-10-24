@@ -23,6 +23,8 @@ const FIGURAS: Figura[] = [
   fig('lucide', 'line', 'microphone', ['microphone', 'mic']),
   fig('fluent', '3d', 'gear-box', ['gearbox'], 'colorida'),
   fig('phosphor', 'bold', 'cloud', ['cloud']),
+  fig('lucide', 'line', 'user', ['user', 'person']),
+  fig('lucide', 'line', 'robot', ['robot', 'bot']),
 ]
 const TEXTO = JSON.stringify({ versao: 1, figuras: FIGURAS })
 const cat = () => parseCatalogo(TEXTO)!
@@ -64,6 +66,19 @@ test('limite conta conceitos', () => {
 
 test('nome exato vem antes de prefixo', () => {
   expect(buscar(cat(), 'gear').map(c => c.conceito)).toEqual(['gear', 'gear-box'])
+})
+
+test('artigo antes de uma palavra só não impede a busca', () => {
+  expect(buscar(cat(), 'o servidor')[0].conceito).toBe('server')
+  expect(buscar(cat(), 'a nuvem')[0].conceito).toBe('cloud')
+  expect(buscar(cat(), 'um robô')[0].conceito).toBe('robot')
+})
+
+test('plural em português cai no singular quando nada é achado', () => {
+  expect(buscar(cat(), 'servidores')[0].conceito).toBe('server')
+  expect(buscar(cat(), 'Usuários')[0].conceito).toBe('user')
+  expect(buscar(cat(), 'os servidores')[0].conceito).toBe('server')
+  expect(buscar(cat(), 'nuvens')[0].conceito).toBe('cloud')
 })
 
 test('sinônimos cobrem os termos pedidos', () => {

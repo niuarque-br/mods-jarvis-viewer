@@ -203,6 +203,9 @@ def escrever_catalogo(destino: Path, entradas: list, pacotes: dict) -> int:
             continue
         vistos.add(e["nome"])
         figuras.append(e)
+    # ordem dos pacotes: juntar as partes na ordem de `pacotes` da exatamente o catalogo inteiro
+    ordem = {p: i for i, p in enumerate(pacotes)}
+    figuras.sort(key=lambda f: ordem.get(f["pacote"], len(ordem)))
     doc = {
         "versao": 1,
         "gerado": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
@@ -212,13 +215,17 @@ def escrever_catalogo(destino: Path, entradas: list, pacotes: dict) -> int:
     Path(destino).mkdir(parents=True, exist_ok=True)
     (Path(destino) / "catalogo.json").write_text(
         json.dumps(doc, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    escrever_partes(destino, figuras, pacotes)
+    return len(figuras)
+
+
+def escrever_partes(destino: Path, figuras: list, pacotes: dict) -> None:
     # O plugin le arquivos de ate 4 MiB ($.fs.read): o catalogo inteiro passa disso,
     # entao cada pacote tambem vai num arquivo proprio (catalogo-<pacote>.json).
     for pacote in pacotes:
         parte = {"versao": 1, "pacote": pacote, "figuras": [f for f in figuras if f["pacote"] == pacote]}
         (Path(destino) / f"catalogo-{pacote}.json").write_text(
             json.dumps(parte, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-    return len(figuras)
 
 
 def _pacotes_info() -> dict:
@@ -228,7 +235,12 @@ def _pacotes_info() -> dict:
 def ja_atualizado(destino: Path) -> bool:
     try:
         doc = json.loads((Path(destino) / "catalogo.json").read_text(encoding="utf-8"))
-        return doc.get("versao") == 1 and doc.get("pacotes") == _pacotes_info()
+        if not (doc.get("versao") == 1 and doc.get("pacotes") == _pacotes_info()):
+            return False
+        # instalacao feita antes das partes por pacote: gera as que faltam a partir do catalogo
+        if not all((Path(destino) / f"catalogo-{p}.json").is_file() for p in doc["pacotes"]):
+            escrever_partes(destino, doc["figuras"], doc["pacotes"])
+        return True
     except Exception:
         return False
 

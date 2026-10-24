@@ -125,3 +125,41 @@ def test_atualizado(tmp_path):
     pacotes["tabler"]["versao"] = "0.0.1"
     bf.escrever_catalogo(tmp_path, [], pacotes)
     assert bf.ja_atualizado(tmp_path) is False
+
+
+def _info():
+    return {k: {"versao": v["versao"], "licenca": v["licenca"]} for k, v in bf.PACOTES.items()}
+
+
+def _entradas():
+    # de proposito fora da ordem dos pacotes
+    return [
+        bf.entrada_icone("lucide", "line", "database", [], ""),
+        bf.entrada_icone("tabler", "outline", "database", [], ""),
+        bf.entrada_icone("phosphor", "bold", "gear", [], ""),
+        bf.entrada_icone("tabler", "filled", "gear", [], ""),
+    ]
+
+
+def _juntar(tmp_path):
+    out = []
+    for p in bf.PACOTES:
+        out += json.loads((tmp_path / f"catalogo-{p}.json").read_text(encoding="utf-8"))["figuras"]
+    return out
+
+
+def test_partes_juntas_sao_o_catalogo_inteiro(tmp_path):
+    bf.escrever_catalogo(tmp_path, _entradas(), _info())
+    inteiro = json.loads((tmp_path / "catalogo.json").read_text(encoding="utf-8"))["figuras"]
+    assert _juntar(tmp_path) == inteiro
+    assert len(inteiro) == 4
+
+
+def test_instalacao_antiga_sem_partes_ganha_as_partes(tmp_path):
+    bf.escrever_catalogo(tmp_path, _entradas(), _info())
+    inteiro = (tmp_path / "catalogo.json").read_text(encoding="utf-8")
+    for p in bf.PACOTES:
+        (tmp_path / f"catalogo-{p}.json").unlink()
+    assert bf.ja_atualizado(tmp_path) is True
+    assert (tmp_path / "catalogo.json").read_text(encoding="utf-8") == inteiro
+    assert _juntar(tmp_path) == json.loads(inteiro)["figuras"]

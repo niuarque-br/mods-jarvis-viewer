@@ -56,7 +56,11 @@ export function parseCatalogo(texto: string): Catalogo | null {
     return null
   }
   const lista = (raw as { figuras?: unknown } | null)?.figuras
-  if (!Array.isArray(lista)) return null
+  return Array.isArray(lista) ? montar(lista) : null
+}
+
+/** Validates the entries and builds the catalog and its search index; null if any entry is invalid. */
+function montar(lista: unknown[]): Catalogo | null {
   const figuras: Figura[] = []
   const porNome = new Map<string, Figura>()
   const indice: Indice[] = []
@@ -84,9 +88,16 @@ export function parseCatalogo(texto: string): Catalogo | null {
   return { figuras, porNome, indice }
 }
 
+/** Portuguese plural -> singular for one word: "s", "es" (servidores) or "ns" -> "m" (nuvens). */
+function singularDe(w: string, regra: 's' | 'es' | 'ns'): string {
+  if (w.length <= 3 || !w.endsWith(regra)) return w
+  return regra === 'ns' ? w.slice(0, -2) + 'm' : w.slice(0, -regra.length)
+}
+
 /** Search keywords: the phrase itself, then its synonyms; a phrase without any is also tried word by word. */
-function palavrasDaBusca(termo: string): string[] {
-  const t = normalizar(termo)
+function palavrasDaBusca(termo: string, singular: 's' | 'es' | 'ns' | null = null): string[] {
+  let t = normalizar(termo)
+  if (singular) t = t.split(' ').map(w => singularDe(w, singular)).join(' ')
   if (!t) return []
   const out: string[] = []
   const add = (k: string) => {
@@ -97,7 +108,7 @@ function palavrasDaBusca(termo: string): string[] {
   if (direto) direto.forEach(add)
   else {
     const partes = t.split(' ').filter(p => !STOP.has(p))
-    if (partes.length > 1) for (const p of partes) {
+    if (partes.length > 0) for (const p of partes) {
       add(p)
       SIN.get(p)?.forEach(add)
     }
@@ -120,8 +131,17 @@ function nivel(ix: Indice, nome: string, kw: string): number {
 }
 
 export function buscar(cat: Catalogo, termo: string, opts: { estilo?: string; limite?: number } = {}): Conceito[] {
-  const kws = palavrasDaBusca(termo)
-  if (kws.length === 0) return []
+  // plural em português: sem resultado, tenta de novo sem o "s" e depois sem o "es" e "ns" -> "m"
+  for (const sing of [null, 's', 'es', 'ns'] as const) {
+    const kws = palavrasDaBusca(termo, sing)
+    if (kws.length === 0) return []
+    const r = buscarPalavras(cat, kws, opts)
+    if (r.length > 0) return r
+  }
+  return []
+}
+
+function buscarPalavras(cat: Catalogo, kws: string[], opts: { estilo?: string; limite?: number }): Conceito[] {
   const limite = Math.max(1, Math.min(50, Math.trunc(opts.limite ?? 8)))
   const filtro = opts.estilo ? normalizar(opts.estilo).replace(/ /g, '-') : ''
   const grupos = new Map<string, { nivel: number; kw: number; figs: Figura[] }>()
@@ -213,7 +233,7 @@ export async function carregarCatalogo($: Engine): Promise<Catalogo | null> {
       if (!parte || !Array.isArray(parte.figuras)) return null
       figuras.push(...parte.figuras)
     }
-    cat = parseCatalogo(JSON.stringify({ figuras }))
+    cat = montar(figuras)
   }
   if (cat) cache = cat
   return cat
