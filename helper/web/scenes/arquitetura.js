@@ -2,7 +2,7 @@
 // arcos de ida em cima e de volta embaixo, e cada hop vira um pacote com rastro.
 // Não importa three: usa stage.THREE, então as funções puras abaixo rodam em `node --test`.
 import { row, layered } from '../engine/layout.js'
-import { makePiece } from '../engine/pieces.js'
+import { makePiece, FORMAS, stale, gone } from '../engine/pieces.js'
 
 const PALETTE = [0xD97757, 0x5B8DEF, 0x36C5A0, 0xE8ECF3, 0xE5B94E, 0xB58AE6, 0xE86A92, 0x62C7E8]
 const HOP_GAP_MS = 900
@@ -52,11 +52,11 @@ export function hopPlan(positions, hops, gapMs = HOP_GAP_MS) {
 
 // Opções da peça de um nó: a `shape` do próprio nó vale mais que a `estilo.forma` da cena; a figura vale mais que as duas.
 export function pieceOptions(n, scene) {
-  const estilo = n && n.shape ? { ...(scene && scene.estilo), forma: n.shape } : scene && scene.estilo
+  const estilo = n && FORMAS.includes(n.shape) ? { ...(scene && scene.estilo), forma: n.shape } : scene && scene.estilo
   return { estilo, padrao: 'caixa' }
 }
 
-export async function build(scene, stage) {
+export async function build(scene, stage, alive) {
   const { THREE } = stage
   const nodes = Array.isArray(scene.nodes) ? scene.nodes : []
   const links = Array.isArray(scene.links) ? scene.links : []
@@ -79,6 +79,7 @@ export async function build(scene, stage) {
   const colors = new Map()
   const cores = nodes.map((n, i) => colorOf(n, i))
   const made = await Promise.all(nodes.map((n, i) => makePiece(stage, n, { ...pieceOptions(n, scene), cor: cores[i] })))
+  if (stale(alive, made)) return gone()
   nodes.forEach((n, i) => {
     const color = cores[i]
     colors.set(n.id, color)

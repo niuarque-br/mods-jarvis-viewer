@@ -2,7 +2,7 @@
 // no estado `initial`. O marcador pula pelo `path` do passo. Câmera de frente (planar).
 // Não importa three: usa stage.THREE, então as funções puras abaixo rodam em `node --test`.
 import { pathEdges, lastStop, createMarker, addArrowHead } from '../engine/flowkit.js'
-import { makePiece } from '../engine/pieces.js'
+import { makePiece, stale, gone } from '../engine/pieces.js'
 
 export { pathEdges }
 
@@ -54,7 +54,7 @@ export function pieceOptions(s, scene) {
   return { estilo: scene && scene.estilo, padrao: 'cilindro' }
 }
 
-export async function build(scene, stage) {
+export async function build(scene, stage, alive) {
   const { THREE } = stage
   const states = Array.isArray(scene.states) ? scene.states : []
   const transitions = Array.isArray(scene.transitions) ? scene.transitions : []
@@ -77,6 +77,7 @@ export async function build(scene, stage) {
     return g
   }
   const made = await Promise.all(states.map((s, i) => makePiece(stage, s, { ...pieceOptions(s, scene), cor: cores[i], desenho: legacy(cores[i]) })))
+  if (stale(alive, made)) return gone()
   states.forEach((s, i) => {
     const color = cores[i]
     colors.set(s.id, color)

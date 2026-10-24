@@ -54,3 +54,8 @@ test('arquitetura: figura > shape do nó > estilo.forma da cena > caixa', () => 
   const plain = archPiece({}, {})
   assert.deepEqual(escolher({}, plain.estilo, plain.padrao), { kind: 'forma', forma: 'caixa' })
 })
+
+test('arquitetura: shape inválido do nó não anula estilo.forma da cena', () => {
+  const o = archPiece({ shape: 'bola' }, { estilo: { forma: 'esfera' } })
+  assert.deepEqual(escolher({ shape: 'bola' }, o.estilo, o.padrao), { kind: 'forma', forma: 'esfera' })
+})

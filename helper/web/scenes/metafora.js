@@ -2,7 +2,7 @@
 // as `actions` de cada passo rodam em paralelo. Estado do passo i = estado inicial + ações dos passos 0..i-1
 // aplicadas na hora + as ações do passo i animadas (play(i) é idempotente, sem depender do passo anterior).
 // Não importa three: usa stage.THREE, então as funções puras abaixo rodam em `node --test`.
-import { makePiece } from '../engine/pieces.js'
+import { makePiece, stale, gone } from '../engine/pieces.js'
 
 const PALETTE = [0xD97757, 0x5B8DEF, 0x36C5A0, 0xE5B94E, 0xB58AE6, 0xE86A92, 0x62C7E8, 0x9AD66B]
 export const DEFAULT_MS = 1200
@@ -125,7 +125,7 @@ export const usesFigure = (o) => !!o && o.shape === 'figura' && typeof o.figura 
 
 const FIG_SIZE = 0.7 // o plano da figura mede 1,6; com size 1 ela fica do tamanho de uma caixa grande
 
-export async function build(scene, stage) {
+export async function build(scene, stage, alive) {
   const { THREE } = stage
   const objects = (Array.isArray(scene.objects) ? scene.objects : []).filter((o) => o && typeof o === 'object' && o.id !== undefined)
   const steps = Array.isArray(scene.steps) ? scene.steps : []
@@ -133,6 +133,7 @@ export async function build(scene, stage) {
   const ents = new Map() // id -> { outer (do palco: posição), inner (nosso: escala e giro) }
   const box = new THREE.Box3()
   const figObjs = await Promise.all(objects.map((o, i) => (usesFigure(o) ? makePiece(stage, o, { padrao: 'caixa', cor: colorOf(o.color, i) }) : null)))
+  if (stale(alive, figObjs)) return gone()
 
   objects.forEach((o, i) => {
     const id = String(o.id)

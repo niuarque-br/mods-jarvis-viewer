@@ -2,7 +2,7 @@
 // O foco afasta as placas acima e abaixo; hops sobem ou descem entre placas.
 // Não importa three: usa stage.THREE, então as funções puras abaixo rodam em `node --test`.
 // Com estilo.arranjo = 'horizontal' as placas ficam em pé, lado a lado (a primeira, o topo, à esquerda).
-import { makePiece } from '../engine/pieces.js'
+import { makePiece, stale, gone } from '../engine/pieces.js'
 
 const PALETTE = [0xD97757, 0x5B8DEF, 0x36C5A0, 0xE5B94E, 0xB58AE6, 0xE86A92, 0x62C7E8, 0x9AD66B]
 const GAP_Y = 2.1 // distância entre placas
@@ -88,7 +88,7 @@ export function figureOffset(horiz) {
   return horiz ? [0, HPLATE_TALL / 2 - 0.95, PLATE_D / 2 + 0.25] : [-PLATE_W / 2 + 0.95, 0, PLATE_D / 2 + 0.25]
 }
 
-export async function build(scene, stage) {
+export async function build(scene, stage, alive) {
   const { THREE } = stage
   const horiz = !!(scene.estilo && scene.estilo.arranjo === 'horizontal')
   const layers = (Array.isArray(scene.layers) ? scene.layers : []).filter((l) => l && typeof l === 'object')
@@ -98,6 +98,7 @@ export async function build(scene, stage) {
   const entries = [] // { id, group, base, chips: [{ group, off, key }], fig, cur, want }
   const plateSize = horiz ? [HPLATE_W, HPLATE_TALL, PLATE_D] : [PLATE_W, PLATE_H, PLATE_D]
   const figs = await Promise.all(layers.map((l) => (l.figura ? makePiece(stage, l, { estilo: scene.estilo, padrao: 'caixa', cor: PALETTE[layers.indexOf(l) % PALETTE.length] }) : null)))
+  if (stale(alive, figs)) return gone()
 
   layers.forEach((l, i) => {
     const color = PALETTE[i % PALETTE.length]

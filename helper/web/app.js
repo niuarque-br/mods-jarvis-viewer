@@ -152,9 +152,12 @@ async function load(item, event) {
   let built
   try {
     if (!stage) throw new Error('sem 3D')
-    built = await mod.build(scene, stage) // as figuras carregam aqui; build pode ser síncrona ou assíncrona
+    if (JSON.stringify(scene).includes('"figura"')) el.text.textContent = 'Carregando figuras…'
+    // as figuras carregam aqui; a montagem só toca no palco se `alive()` ainda valer (outra cena pode ter chegado)
+    built = await mod.build(scene, stage, () => seq === loadSeq)
   } catch (e) {
     console.error(e)
+    if (seq !== loadSeq) return
     return loadFailed(`Não consegui montar a cena «${scene.title || type}».`)
   }
   if (seq !== loadSeq) { // outra cena chegou enquanto as figuras carregavam: esta já não vale

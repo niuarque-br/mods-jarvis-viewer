@@ -1,7 +1,7 @@
 // Cena «sequencia»: atores em colunas com linha de vida; mensagens são setas horizontais em descida.
 // A mensagem destacada aparece e manda um pacote. Câmera de frente (planar).
 import { row } from '../engine/layout.js'
-import { makePiece } from '../engine/pieces.js'
+import { makePiece, stale, gone } from '../engine/pieces.js'
 
 const PALETTE = [0xD97757, 0x5B8DEF, 0x36C5A0, 0xE8ECF3, 0xE5B94E, 0xB58AE6, 0xE86A92, 0x62C7E8]
 const TOP_Y = -2.0 // primeira mensagem
@@ -32,7 +32,7 @@ export function pieceOptions(a, scene) {
   return { estilo: scene && scene.estilo, padrao: 'caixa' }
 }
 
-export async function build(scene, stage) {
+export async function build(scene, stage, alive) {
   const { THREE } = stage
   const actors = Array.isArray(scene.actors) ? scene.actors : []
   const messages = Array.isArray(scene.messages) ? scene.messages : []
@@ -53,6 +53,7 @@ export async function build(scene, stage) {
     return g
   }
   const made = await Promise.all(actors.map((a) => makePiece(stage, a, { ...pieceOptions(a, scene), cor: colors.get(a.id), desenho: legacy(colors.get(a.id)) })))
+  if (stale(alive, made)) return gone()
   actors.forEach((a, ai) => {
     const color = colors.get(a.id)
     const g = made[ai]

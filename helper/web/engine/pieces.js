@@ -155,3 +155,12 @@ export async function makePiece(stage, peca, { estilo, padrao, cor, contorno, de
   outer.userData.fallback = choice.kind === 'figura' && !plane
   return outer
 }
+
+// Uma montagem assíncrona que ficou velha (outra cena chegou) não pode tocar no palco: solta as peças já criadas
+// (cada uma só registrou um callback de quadro) e quem chama devolve `gone()`.
+export function stale(alive, objs) {
+  if (typeof alive !== 'function' || alive()) return false
+  for (const o of objs || []) if (o && o.userData && typeof o.userData.dispose === 'function') o.userData.dispose()
+  return true
+}
+export const gone = () => ({ pieces: new Map(), async play() {}, dispose() {} })

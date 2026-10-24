@@ -2,7 +2,7 @@
 // e as arestas rotuladas mostram o rótulo quando o marcador passa. Câmera de frente (planar).
 // Não importa three: usa stage.THREE, então as funções puras abaixo rodam em `node --test`.
 import { layered, arrange } from '../engine/layout.js'
-import { makePiece } from '../engine/pieces.js'
+import { makePiece, stale, gone } from '../engine/pieces.js'
 import { pathEdges, lastStop, markerPos, createMarker, addArrowHead } from '../engine/flowkit.js'
 
 export { pathEdges, lastStop, markerPos }
@@ -59,7 +59,7 @@ function legacyMesh(THREE, n, color) {
   return g
 }
 
-export async function build(scene, stage) {
+export async function build(scene, stage, alive) {
   const { THREE } = stage
   const nodes = Array.isArray(scene.nodes) ? scene.nodes : []
   const edges = Array.isArray(scene.edges) ? scene.edges : []
@@ -71,6 +71,7 @@ export async function build(scene, stage) {
   const pieces = new Map()
   const cores = nodes.map((n) => COLORS[n.kind] ?? COLORS.etapa)
   const made = await Promise.all(nodes.map((n, i) => makePiece(stage, n, { ...pieceOptions(n, scene), cor: cores[i], desenho: () => legacyMesh(THREE, n, cores[i]) })))
+  if (stale(alive, made)) return gone()
   nodes.forEach((n, i) => {
     const color = cores[i]
     const g = made[i]

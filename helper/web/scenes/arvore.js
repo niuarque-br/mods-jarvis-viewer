@@ -2,7 +2,7 @@
 // `highlight` acende o caminho da raiz até o nó e manda pacotes descendo por ele. Câmera de frente (planar).
 // Não importa three: usa stage.THREE, então as funções puras abaixo rodam em `node --test`.
 import { tree, arrange } from '../engine/layout.js'
-import { makePiece } from '../engine/pieces.js'
+import { makePiece, stale, gone } from '../engine/pieces.js'
 import { pathEdges } from '../engine/flowkit.js'
 
 export { pathEdges }
@@ -52,7 +52,7 @@ export function treePositions(nodes, estilo) {
   return arrange(tree(nodes), estilo)
 }
 
-export async function build(scene, stage) {
+export async function build(scene, stage, alive) {
   const { THREE } = stage
   const nodes = Array.isArray(scene.nodes) ? scene.nodes : []
   const horiz = !!(scene.estilo && scene.estilo.arranjo === 'horizontal')
@@ -69,6 +69,7 @@ export async function build(scene, stage) {
     return g
   }
   const made = await Promise.all(nodes.map((n, i) => makePiece(stage, n, { ...pieceOptions(n, scene), cor: cores[i], desenho: legacy(depth.get(n.id), cores[i]) })))
+  if (stale(alive, made)) return gone()
   nodes.forEach((n, i) => {
     const color = cores[i]
     const g = made[i]
