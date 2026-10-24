@@ -30,6 +30,14 @@ test('os dois modos orientam figuras', () => {
     expect(g.length).toBeLessThan(1800)
   }
 })
+test('pedido de forma da cena tira shape e figura das peças; sem figuras instaladas segue sem elas', () => {
+  for (const modo of ['IA escolhe', 'Sob demanda']) {
+    const g = guidance(modo)
+    for (const s of ['tire shape e figura das peças', 'não há figuras instaladas, siga sem figuras', 'estilo.figuras só informa']) expect(g).toContain(s)
+    expect(g.length).toBeLessThan(1800)
+  }
+  for (const s of ['tire shape e figura das peças', 'estilo.figuras só informa']) expect(TOOL_DESCRIPTION).toContain(s)
+})
 test('a descrição de mostrar_cena cita figura, movimento e estilo', () => {
   for (const s of ['figura', 'movimento', 'estilo', 'buscar_figura']) expect(TOOL_DESCRIPTION).toContain(s)
   expect(TOOL_DESCRIPTION.length).toBeLessThanOrEqual(4096)

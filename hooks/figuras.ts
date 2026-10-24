@@ -195,10 +195,13 @@ function buscarPalavras(cat: Catalogo, kws: string[], opts: { estilo?: string; l
 }
 
 let cache: Catalogo | null = null
+// The load in flight, shared by parallel calls; cleared when it settles, so a missing catalog is retried next time.
+let carregando: Promise<Catalogo | null> | null = null
 
 /** Forgets the loaded catalog (session.start). */
 export function esquecerCatalogo(): void {
   cache = null
+  carregando = null
 }
 
 const PACOTES = ['fluent', 'tabler', 'lucide', 'phosphor']
@@ -212,29 +215,49 @@ async function ler($: Engine, nome: string): Promise<string | null> {
   }
 }
 
+/** Joins the per-package files; 'faltando' when any is missing, null when one is corrupt. */
+async function lerPartes($: Engine): Promise<Catalogo | null | 'faltando'> {
+  const textos = await Promise.all(PACOTES.map(p => ler($, `catalogo-${p}.json`)))
+  if (textos.some(t => t === null)) return 'faltando'
+  const figuras: unknown[] = []
+  for (const t of textos) {
+    let parte: { figuras?: unknown } | null = null
+    try {
+      parte = JSON.parse(t as string) as { figuras?: unknown }
+    } catch {
+      return null
+    }
+    if (!parte || !Array.isArray(parte.figuras)) return null
+    figuras.push(...parte.figuras)
+  }
+  return montar(figuras)
+}
+
 /**
  * The installed catalog, read once per session; null when missing or corrupt (not cached, so installing mid-session works).
- * `$.fs.read` stops at 4 MiB and the whole catalog is bigger, so a rejected read falls back to the per-package files.
+ * `$.fs.read` stops at 4 MiB and the whole catalog is bigger, so the per-package files are read first; the single
+ * catalogo.json is only tried when they are missing (older or hand-made installs).
  */
-export async function carregarCatalogo($: Engine): Promise<Catalogo | null> {
-  if (cache) return cache
-  const inteiro = await ler($, 'catalogo.json')
-  let cat = inteiro === null ? null : parseCatalogo(inteiro)
-  if (!cat) {
-    const figuras: unknown[] = []
-    for (const p of PACOTES) {
-      const t = await ler($, `catalogo-${p}.json`)
-      let parte: { figuras?: unknown } | null = null
-      try {
-        parte = t === null ? null : (JSON.parse(t) as { figuras?: unknown })
-      } catch {
-        return null
-      }
-      if (!parte || !Array.isArray(parte.figuras)) return null
-      figuras.push(...parte.figuras)
-    }
-    cat = montar(figuras)
-  }
-  if (cat) cache = cat
-  return cat
+export function carregarCatalogo($: Engine): Promise<Catalogo | null> {
+  if (cache) return Promise.resolve(cache)
+  if (carregando) return carregando
+  const p = (async () => {
+    const partes = await lerPartes($)
+    if (partes !== 'faltando') return partes
+    const inteiro = await ler($, 'catalogo.json')
+    return inteiro === null ? null : parseCatalogo(inteiro)
+  })()
+  carregando = p
+  // A load that session.start forgot meanwhile is not cached.
+  void p.then(
+    cat => {
+      if (carregando !== p) return
+      carregando = null
+      if (cat) cache = cat
+    },
+    () => {
+      if (carregando === p) carregando = null
+    },
+  )
+  return p
 }

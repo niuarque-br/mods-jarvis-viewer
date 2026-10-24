@@ -134,6 +134,36 @@ test('sem catalogo.json inteiro, junta os arquivos por pacote', async ($, on) =>
   expect(JSON.parse(body(r))[0].conceito).toBe('server')
 })
 
+test('chamadas paralelas leem o catálogo uma vez só, direto das partes', async ($, on) => {
+  mock.clock(on)
+  const parte = (p: string) => JSON.stringify({ figuras: FIGURAS.filter(f => f.pacote === p) })
+  const calls = world(on, {
+    fs: { 'catalogo-fluent.json': parte('fluent'), 'catalogo-tabler.json': parte('tabler'), 'catalogo-lucide.json': parte('lucide'), 'catalogo-phosphor.json': parte('phosphor') },
+  })
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true }) // esquece o catálogo das outras provas
+  calls.reads.length = 0
+  const rs = await Promise.all(['servidor', 'gear', 'cloud'].map(termo => $.tool.call({ tool: FIG, termo })))
+  for (const r of rs) expect(r.deny).toBeUndefined()
+  expect(calls.reads).not.toContain('catalogo.json')
+  expect([...calls.reads].sort()).toEqual(['catalogo-fluent.json', 'catalogo-lucide.json', 'catalogo-phosphor.json', 'catalogo-tabler.json'])
+})
+
+test('sem catálogo, a próxima chamada tenta de novo (instalação no meio da sessão)', async ($, on) => {
+  mock.clock(on)
+  const fs: Record<string, string> = {}
+  const calls = world(on, { fs })
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  const [a, b] = await Promise.all([$.tool.call({ tool: FIG, termo: 'gear' }), $.tool.call({ tool: FIG, termo: 'gear' })])
+  expect(a.deny).toBe(SEM_FIGURAS)
+  expect(b.deny).toBe(SEM_FIGURAS)
+  fs['catalogo.json'] = TEXTO
+  const r = await $.tool.call({ tool: FIG, termo: 'gear' })
+  expect(r.deny).toBeUndefined()
+  expect(calls.reads.length).toBeGreaterThan(0)
+})
+
 test('termo vazio é recusado', async ($, on) => {
   mock.clock(on)
   world(on, { fs: { 'catalogo.json': TEXTO } })

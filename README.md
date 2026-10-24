@@ -62,14 +62,14 @@ claude plugin install jarvis-viewer --marketplace niuarque-br/mods-jarvis-viewer
 
 Depois abra uma sessão nova ou rode `/reload-plugins`.
 
-**Figuras (uma vez):** as figuras não vêm no repositório. Rode `python scripts/baixar-figuras.py` uma vez na pasta do plugin; o script baixa os pacotes de licença livre (Fluent Emoji, Tabler, Lucide e Phosphor) para `assets/figuras/` e gera o catálogo. Sem isso o viewer funciona normalmente, só com as formas geométricas, e a busca avisa "figuras não instaladas".
+**Figuras (uma vez):** as figuras não vêm no repositório. Rode `python scripts/baixar-figuras.py` uma vez na pasta do plugin; o script baixa os pacotes de licença livre (Fluent Emoji, Tabler, Lucide e Phosphor) para `assets/figuras/` e gera o catálogo. Sem isso o viewer funciona normalmente, só com as formas geométricas, e a busca avisa "figuras não instaladas". Numa instalação pelo marketplace, cada atualização troca a pasta do plugin: rode `python scripts/baixar-figuras.py` de novo depois de atualizar (instalação pela pasta local não é afetada).
 
 ## Usar
 
 - **Sob demanda**: clique em **🧊 Jarvis Viewer** acima do prompt, digite `/viewer`, peça "mostra num desenho" ou, com o Jarvis ligado, diga isso em voz alta.
 - **Claude escolhe**: o Claude abre o viewer sozinho quando um desenho ajuda. Respostas curtas e ajustes pontuais continuam só em texto.
 - Na tela: **▶** reproduz, **⟲** recomeça, e o interruptor **🔊 Narração / 💬 Legenda** troca o modo. Arraste para girar a cena.
-- **Figuras**: o Claude procura uma figura para cada peça (`buscar_figura`) e mantém um estilo só na cena. Peça do seu jeito: "use caixas no lugar de círculos" troca as formas da cena toda, "árvore deitada" põe árvore, fluxo ou camadas na horizontal, e "use um ícone de engrenagem no auxiliar" escolhe a figura de uma peça.
+- **Figuras**: o Claude procura uma figura para cada peça (`buscar_figura`) e mantém um estilo só na cena. Peça do seu jeito: "use caixas no lugar de círculos" troca as formas da cena toda (o Claude tira as figuras e formas próprias das peças, que senão venceriam), "árvore deitada" põe árvore, fluxo ou camadas na horizontal, e "use um ícone de engrenagem no auxiliar" escolhe a figura de uma peça.
 - Peça "de novo" ou "volta no passo 3" para rever a última cena.
 
 ## Opções

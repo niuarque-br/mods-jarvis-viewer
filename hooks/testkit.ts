@@ -16,6 +16,8 @@ export type World = {
   store: Map<string, unknown>
   pages: number
   order: string[]
+  /** Names read under assets/figuras, in order (hit or miss). */
+  reads: string[]
   release: () => void
   emit: (line: Record<string, unknown>) => void
 }
@@ -55,6 +57,7 @@ export function world(on: On, opts: WorldOptions = {}): World {
     store: new Map(Object.entries(opts.store ?? {})),
     pages: opts.pages ?? 0,
     order: [],
+    reads: [],
     release: () => {
       open()
       wake()
@@ -75,6 +78,7 @@ export function world(on: On, opts: WorldOptions = {}): World {
   })
   on('fs.read', async ($, e) => {
     const name = String(e.path).split(/[\\/]/).pop() ?? ''
+    calls.reads.push(name)
     if (opts.fs === undefined || opts.fs === 'fail' || !(name in opts.fs)) throw new Error('ENOENT')
     return { value: opts.fs[name] }
   })

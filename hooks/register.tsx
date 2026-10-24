@@ -45,7 +45,7 @@ Tipos e suas listas:
 - comparacao: sides (exatamente 2) {id,label,items:[{id,label,value?}]}
 - metafora: objects {id,shape,pos:[x,y,z],size?,color?,text?}; steps com actions {target,do: mover|girar|pulsar|aparecer|sumir|seguir,to?,path?,ms?}
 
-Figuras (opcional): peças de arquitetura, fluxo, estados, camadas, arvore, sequencia e comparacao aceitam figura "<pacote>/<estilo>:<id>" e movimento (girar|pulsar|balancar|subir|respirar|piscar); em metafora use shape "figura" com figura. Ache o nome com buscar_figura. estilo {forma?, arranjo?: vertical|horizontal, figuras?: "<pacote>/<estilo>"} muda a cena toda: estilo.forma troca as formas, estilo.arranjo deita arvore, fluxo e camadas.
+Figuras (opcional): peças de arquitetura, fluxo, estados, camadas, arvore, sequencia e comparacao aceitam figura "<pacote>/<estilo>:<id>" e movimento (girar|pulsar|balancar|subir|respirar|piscar); em metafora use shape "figura" com figura. Ache o nome com buscar_figura. estilo {forma?, arranjo?: vertical|horizontal, figuras?: "<pacote>/<estilo>"} muda a cena toda: estilo.forma troca as formas (figura e shape da peça vencem: num pedido da cena toda, tire shape e figura das peças), estilo.arranjo deita arvore, fluxo e camadas; estilo.figuras só informa o estilo dominante (dica, sem efeito).
 
 Se a cena for recusada, a resposta lista cada erro com o caminho do campo; corrija e chame de novo. Se a resposta pedir para abrir um endereço, abra-o no navegador embutido com preview_start (parâmetro url); a cena aparece sozinha.
 
