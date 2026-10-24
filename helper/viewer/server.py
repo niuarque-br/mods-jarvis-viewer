@@ -21,6 +21,8 @@ MAX_BODY = 1024 * 1024
 KEEPALIVE_SECONDS = 15.0
 TYPES = {".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".html": "text/html"}
 
+FIGURE_TYPES = {".png": "image/png", ".svg": "image/svg+xml"}
+
 
 class Emitter:
     def __init__(self, out: TextIO) -> None:
@@ -54,8 +56,10 @@ def make_server(
     out: TextIO,
     web_dir: Path,
     on_quit: Callable[[], None] | None = None,
+    figuras_dir: Path | None = None,
 ) -> ViewerServer:
     web_root = Path(web_dir).resolve()
+    figuras_root = Path(figuras_dir).resolve() if figuras_dir is not None else None
 
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
@@ -75,12 +79,20 @@ def make_server(
             given = self.headers.get("X-Viewer-Token") or (query.get("t") or [""])[0]
             return hmac.compare_digest(given.encode(), token.encode())
 
-        def _send(self, status: int, body: bytes = b"", ctype: str = "application/json") -> None:
+        def _send(
+            self,
+            status: int,
+            body: bytes = b"",
+            ctype: str = "application/json",
+            extra: dict[str, str] | None = None,
+        ) -> None:
             self.send_response(status)
             if body or status != 204:
                 self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-store")
+            headers = {"Cache-Control": "no-store", **(extra or {})}
+            for key, value in headers.items():
+                self.send_header(key, value)
             self.end_headers()
             if body:
                 self.wfile.write(body)
@@ -124,6 +136,9 @@ def make_server(
                 return self._events()
             if path == "/state":
                 return self._json(200, {"pages": self.server.pages})
+            decoded = unquote(path).lstrip("/")
+            if decoded.startswith("figuras/"):
+                return self._figura(decoded[len("figuras/"):])
             self._static("index.html" if path == "/" else unquote(path).lstrip("/"))
 
         def _static(self, name: str) -> None:
@@ -135,6 +150,22 @@ def make_server(
                 return self._json(404, {"error": "arquivo"})
             ctype = TYPES.get(target.suffix) or mimetypes.guess_type(target.name)[0] or "application/octet-stream"
             self._send(200, target.read_bytes(), ctype)
+
+        def _figura(self, name: str) -> None:
+            ctype = FIGURE_TYPES.get(Path(name).suffix)
+            if figuras_root is None or ctype is None:
+                return self._json(404, {"error": "arquivo"})
+            try:
+                target = (figuras_root / name).resolve()
+                if figuras_root not in target.parents or not target.is_file():
+                    return self._json(404, {"error": "arquivo"})
+                body = target.read_bytes()
+            except (OSError, ValueError):
+                return self._json(404, {"error": "arquivo"})
+            extra = {"Cache-Control": "max-age=86400"}
+            if ctype == "image/svg+xml":
+                extra["X-Content-Type-Options"] = "nosniff"
+            self._send(200, body, ctype, extra)
 
         def _closed(self) -> bool:
             try:

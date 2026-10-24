@@ -336,3 +336,69 @@ def test_mode_reenviado_sem_from(helper):
     assert again.next()["type"] == "scene"
     assert again.next() == {"type": "mode", "narrator": "page", "narration": True}
     again.close()
+
+
+@pytest.fixture
+def figuras_helper(tmp_path):
+    figs = tmp_path / "figuras"
+    (figs / "fluent" / "3d").mkdir(parents=True)
+    (figs / "fluent" / "3d" / "gear.png").write_bytes(b"PNG fake")
+    (figs / "tabler").mkdir()
+    (figs / "tabler" / "gear.svg").write_text("<svg/>", encoding="utf-8")
+    (figs / "tabler" / "nota.txt").write_text("x", encoding="utf-8")
+    web = tmp_path / "web"
+    web.mkdir()
+    (web / "index.html").write_text("x", encoding="utf-8")
+    (web / "server.py").write_text("x", encoding="utf-8")
+    server = make_server(0, TOKEN, Out(), web_dir=web, figuras_dir=figs)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    yield server.server_address[1]
+    server.shutdown()
+    server.server_close()
+
+
+def fig_get(port, path, headers=None):
+    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+    conn.request("GET", path, headers=headers or {})
+    resp = conn.getresponse()
+    body = resp.read()
+    out = (resp.status, dict(resp.getheaders()), body)
+    conn.close()
+    return out
+
+
+def test_figuras_png_e_svg_com_tipo_certo(figuras_helper):
+    status_, headers, body = fig_get(figuras_helper, f"/{TOKEN}/figuras/fluent/3d/gear.png")
+    assert status_ == 200 and headers["Content-Type"] == "image/png" and body == b"PNG fake"
+    assert headers["Cache-Control"] == "max-age=86400"
+    status_, headers, _ = fig_get(figuras_helper, f"/{TOKEN}/figuras/tabler/gear.svg")
+    assert status_ == 200 and headers["Content-Type"] == "image/svg+xml"
+    assert headers["X-Content-Type-Options"] == "nosniff"
+
+
+def test_figuras_sem_token_401(figuras_helper):
+    assert fig_get(figuras_helper, "/figuras/tabler/gear.svg")[0] == 401
+    assert fig_get(figuras_helper, "/errado/figuras/tabler/gear.svg")[0] in (401, 404)
+
+
+def test_figuras_travessia_404(figuras_helper):
+    for path in ("/figuras/../web/server.py", "/figuras/..%2Fweb%2Fserver.py", "/figuras/%2e%2e/web/index.html"):
+        assert fig_get(figuras_helper, f"/{TOKEN}{path}")[0] == 404
+
+
+def test_figuras_outra_extensao_e_inexistente_404(figuras_helper):
+    assert fig_get(figuras_helper, f"/{TOKEN}/figuras/tabler/nota.txt")[0] == 404
+    assert fig_get(figuras_helper, f"/{TOKEN}/figuras/tabler/nao.svg")[0] == 404
+
+
+def test_figuras_pasta_ausente_404(tmp_path):
+    web = tmp_path / "web"
+    web.mkdir()
+    for kwargs in ({"figuras_dir": tmp_path / "nada"}, {}):
+        server = make_server(0, TOKEN, Out(), web_dir=web, **kwargs)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            assert fig_get(server.server_address[1], f"/{TOKEN}/figuras/a.png")[0] == 404
+        finally:
+            server.shutdown()
+            server.server_close()

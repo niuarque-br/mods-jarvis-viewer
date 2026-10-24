@@ -8,7 +8,7 @@ import threading
 import time
 from pathlib import Path
 
-from viewer.__main__ import run, watch_parent
+from viewer.__main__ import figuras_dir, run, watch_parent
 
 
 def busy(port):
@@ -80,3 +80,17 @@ def test_watch_parent_fires_when_parent_exits():
     assert not fired.wait(0.3)
     proc.kill()
     assert fired.wait(5)
+
+
+def test_figuras_dir_no_modo_dev():
+    repo = Path(__file__).resolve().parent.parent.parent
+    assert figuras_dir() == repo / "assets" / "figuras"
+
+
+def test_figuras_dir_no_exe(monkeypatch, tmp_path):
+    exe = tmp_path / "plugin" / "bin" / "viewer-helper.exe"
+    exe.parent.mkdir(parents=True)
+    exe.write_bytes(b"")
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "executable", str(exe))
+    assert figuras_dir() == (tmp_path / "plugin").resolve() / "assets" / "figuras"

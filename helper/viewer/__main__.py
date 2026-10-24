@@ -16,6 +16,13 @@ def web_dir() -> Path:
     return Path(base) / "web" if base else Path(__file__).resolve().parent.parent / "web"
 
 
+def figuras_dir() -> Path:
+    if getattr(sys, "frozen", False):
+        # o exe fica em <plugin>/bin/
+        return Path(sys.executable).resolve().parent.parent / "assets" / "figuras"
+    return Path(__file__).resolve().parent.parent.parent / "assets" / "figuras"
+
+
 def watch_parent(pid: int, on_gone) -> None:
     def wait() -> None:
         kernel32 = ctypes.windll.kernel32
@@ -42,7 +49,7 @@ def run(argv: list[str], environ: Mapping[str, str], out: TextIO) -> int:
     server = None
     for port in range(args.port_from, args.port_to + 1):
         try:
-            server = make_server(port, token, out, web_dir(), on_quit=stop.set)
+            server = make_server(port, token, out, web_dir(), on_quit=stop.set, figuras_dir=figuras_dir())
             break
         except OSError:
             continue
