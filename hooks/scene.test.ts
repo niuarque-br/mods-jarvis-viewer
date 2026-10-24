@@ -1,6 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
-import { validateScene, pieceLabel } from './scene'
+import { parseCatalogo } from './figuras'
+import { validateScene, pieceLabel, usaFigura } from './scene'
 import type { Scene } from './scene'
 
 const S = [{ say: 'passo' }]
@@ -161,4 +162,64 @@ test('pieceLabel de ponto de gráfico: série · categoria (M2)', () => {
   } as unknown as Scene
   expect(pieceLabel(scatter, 'p#0')).toBe('Alfa')
   expect(pieceLabel(scatter, 'p#1')).toBe('Pontos · 2')
+})
+
+// --- figura / movimento / estilo ---
+const CAT = parseCatalogo(
+  JSON.stringify({
+    figuras: [
+      { nome: 'fluent/3d:gear', pacote: 'fluent', estilo: '3d', id: 'gear', arquivo: 'fluent/3d/gear.svg', titulo: 'gear', palavras: ['gear'], categoria: '', conceito: 'gear', tom: 'colorida' },
+    ],
+  }),
+)!
+const errsC = (x: unknown, cat: typeof CAT | null | undefined = CAT): string[] => {
+  const v = validateScene(x, cat)
+  return v.ok ? [] : v.errors
+}
+const arqFig = (f: string, extra: Record<string, unknown> = {}) => ({
+  ...ARQ,
+  nodes: [{ id: 'a', label: 'A' }, { id: 'aux', label: 'Auxiliar', figura: f, ...extra }],
+})
+
+test('figura válida passa', () => expect(errsC(arqFig('fluent/3d:gear', { movimento: 'girar' }))).toEqual([]))
+test('figura inexistente', () =>
+  expect(errsC(arqFig('fluent/3d:xyz'))).toEqual(['nodes[1].figura: figura "fluent/3d:xyz" não existe']))
+test('sem catálogo e com figura', () => {
+  const t = 'nodes[1].figura: figuras não instaladas; rode scripts/baixar-figuras.py'
+  expect(errsC(arqFig('fluent/3d:gear'), null)).toEqual([t])
+  expect(errs(arqFig('fluent/3d:gear'))).toEqual([t])
+})
+test('movimento inválido', () =>
+  expect(errsC(arqFig('fluent/3d:gear', { movimento: 'voar' }))).toEqual([
+    'nodes[1].movimento: precisa ser um de girar, pulsar, balancar, subir, respirar, piscar',
+  ]))
+test('estilo.arranjo só em arvore/fluxo/camadas', () => {
+  expect(errs({ ...ARQ, estilo: { arranjo: 'vertical' } })).toEqual(['estilo.arranjo: só vale em arvore, fluxo e camadas'])
+  expect(errs({ ...FIXTURES[7], estilo: { arranjo: 'horizontal', forma: 'esfera', figuras: 'tabler/outline' } })).toEqual([])
+  expect(errs({ ...ARQ, estilo: { forma: 'cubo', figuras: 'x/y' } }).length).toBe(2)
+})
+test('metafora shape figura exige figura', () => {
+  const m = (o: Record<string, unknown>) => ({ ...FIXTURES[9], objects: [{ id: 'o', pos: [0, 0, 0], ...o }] })
+  expect(errsC(m({ shape: 'figura' }))).toEqual(['objects[0].figura: obrigatório para shape "figura"'])
+  expect(errsC(m({ shape: 'figura', figura: 'fluent/3d:gear' }))).toEqual([])
+  expect(errsC(m({ shape: 'caixa', figura: 'fluent/3d:gear' }))).toEqual(['objects[0].figura: só vale com shape "figura"'])
+})
+test('figura em sequência, estados, camadas e comparação', () => {
+  const f = 'fluent/3d:nada'
+  const w = (i: number, key: string, mut: (x: any) => void) => {
+    const s = JSON.parse(JSON.stringify(FIXTURES[i]))
+    mut(s[key])
+    return errsC(s)
+  }
+  expect(w(4, 'actors', (a) => (a[0].figura = f))).toEqual([`actors[0].figura: figura "${f}" não existe`])
+  expect(w(5, 'states', (a) => (a[0].figura = f))).toEqual([`states[0].figura: figura "${f}" não existe`])
+  expect(w(6, 'layers', (a) => (a[0].figura = f))).toEqual([`layers[0].figura: figura "${f}" não existe`])
+  expect(w(8, 'sides', (a) => (a[0].items[0].figura = f))).toEqual([`sides[0].items[0].figura: figura "${f}" não existe`])
+})
+test('cena sem campos novos continua igual', () => {
+  for (const s of FIXTURES) expect(errsC(s, null)).toEqual([])
+})
+test('usaFigura', () => {
+  expect(usaFigura(arqFig('x'))).toBe(true)
+  expect(usaFigura(ARQ)).toBe(false)
 })

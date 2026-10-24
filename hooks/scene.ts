@@ -1,3 +1,6 @@
+import { SEM_FIGURAS } from './figuras'
+import type { Catalogo } from './figuras'
+
 export const SCENE_TYPES = [
   'arquitetura',
   'fluxo',
@@ -45,13 +48,23 @@ const join = (path: string, key: string): string => (path ? `${path}.${key}` : k
 const SHAPES = ['caixa', 'esfera', 'octaedro', 'cilindro', 'pessoa', 'orbe']
 const FLOW_KINDS = ['inicio', 'etapa', 'decisao', 'fim']
 const CHARTS = ['barras', 'linhas', 'rosca', 'dispersao']
-const META_SHAPES = ['caixa', 'esfera', 'cilindro', 'cone', 'toro', 'plano', 'texto', 'particulas']
+const META_SHAPES = ['caixa', 'esfera', 'cilindro', 'cone', 'toro', 'plano', 'texto', 'particulas', 'figura']
+export const MOVIMENTOS = ['girar', 'pulsar', 'balancar', 'subir', 'respirar', 'piscar'] as const
+const ARRANJOS = ['vertical', 'horizontal']
+const ARRANJO_TIPOS = ['arvore', 'fluxo', 'camadas']
+const ESTILOS_FIGURA = [
+  'fluent/3d', 'fluent/color', 'fluent/flat', 'fluent/hc',
+  'tabler/outline', 'tabler/filled',
+  'lucide/line',
+  'phosphor/thin', 'phosphor/light', 'phosphor/regular', 'phosphor/bold', 'phosphor/fill', 'phosphor/duotone',
+]
 const META_DO = ['mover', 'girar', 'pulsar', 'aparecer', 'sumir', 'seguir']
 const KIND_NAME: Record<Kind, string> = { string: 'texto', number: 'número', boolean: 'booleano' }
 
 class Check {
   errors: string[] = []
   ids = new Set<string>()
+  catalogo: Catalogo | null | undefined
 
   err(path: string, reason: string): void {
     const msg = `${path}: ${reason}`
@@ -95,6 +108,16 @@ class Check {
     if (this.ids.has(v)) return this.err(`${path}.id`, `id "${v}" repetido`)
     this.ids.add(v)
   }
+  // Optional `figura` (must exist in the catalog) and `movimento`.
+  figura(o: Obj, path: string): void {
+    const f = o.figura
+    if (f !== undefined) {
+      if (!isStr(f) || f.trim() === '') this.err(join(path, 'figura'), 'precisa ser texto')
+      else if (!this.catalogo) this.err(join(path, 'figura'), SEM_FIGURAS)
+      else if (!this.catalogo.porNome.has(f)) this.err(join(path, 'figura'), `figura "${f}" não existe`)
+    }
+    this.oneOf(o, 'movimento', path, [...MOVIMENTOS], false)
+  }
   item(o: Obj, path: string, labelRequired = true): void {
     this.id(o, path)
     if (labelRequired) this.text(o, 'label', path)
@@ -108,6 +131,8 @@ class Check {
     if (count > LIMITS.pieces) this.err(path, `no máximo ${LIMITS.pieces} peças (veio ${count})`)
   }
 }
+
+const FIGURA_KEYS = ['nodes', 'states', 'layers']
 
 function checkEdges(c: Check, scene: Obj, key: string): void {
   c.list(scene, key)?.forEach((e, i) => {
@@ -123,6 +148,7 @@ function checkBody(c: Check, scene: Obj, type: SceneType): void {
     const arr = c.list(scene, key) ?? []
     arr.forEach((n, i) => {
       c.item(n, `${key}[${i}]`, labelRequired)
+      if (FIGURA_KEYS.includes(key)) c.figura(n, `${key}[${i}]`)
       fn?.(n, `${key}[${i}]`)
     })
     c.limit(key, arr.length)
@@ -162,11 +188,17 @@ function checkBody(c: Check, scene: Obj, type: SceneType): void {
         if (isStr(n.color) && !/^#[0-9a-fA-F]{6}$/.test(n.color)) c.err(`${p}.color`, 'precisa ser uma cor no formato #rrggbb')
         c.optional(n, 'text', p, 'string')
         if (n.shape === 'texto' && (!isStr(n.text) || n.text === '')) c.err(`${p}.text`, 'obrigatório para shape "texto"')
+        if (n.shape === 'figura' && n.figura === undefined) c.err(`${p}.figura`, 'obrigatório para shape "figura"')
+        else if (n.figura !== undefined && n.shape !== 'figura') c.err(`${p}.figura`, 'só vale com shape "figura"')
+        else if (n.figura !== undefined) c.figura(n, p)
       }, false)
       break
     case 'sequencia': {
       const actors = c.list(scene, 'actors') ?? []
-      actors.forEach((a, i) => c.item(a, `actors[${i}]`))
+      actors.forEach((a, i) => {
+        c.item(a, `actors[${i}]`)
+        c.figura(a, `actors[${i}]`)
+      })
       const actorIds = new Set(actors.map((a) => a.id).filter(isStr))
       const msgs = c.list(scene, 'messages') ?? []
       msgs.forEach((m, i) => {
@@ -225,6 +257,7 @@ function checkBody(c: Check, scene: Obj, type: SceneType): void {
         count += items.length
         items.forEach((it, j) => {
           c.item(it, `${p}.items[${j}]`)
+          c.figura(it, `${p}.items[${j}]`)
           const v = it.value
           if (v !== undefined && !isStr(v) && !isNum(v)) c.err(`${p}.items[${j}].value`, 'precisa ser texto ou número')
         })
@@ -336,9 +369,29 @@ function checkSteps(c: Check, scene: Obj, type: SceneType): void {
   })
 }
 
-export function validateScene(input: unknown): Validation {
+function checkEstilo(c: Check, scene: Obj, type: SceneType): void {
+  const e = scene.estilo
+  if (e === undefined) return
+  if (!isObj(e)) return c.err('estilo', 'precisa ser um objeto')
+  c.oneOf(e, 'forma', 'estilo', SHAPES, false)
+  c.oneOf(e, 'figuras', 'estilo', ESTILOS_FIGURA, false)
+  c.oneOf(e, 'arranjo', 'estilo', ARRANJOS, false)
+  if (e.arranjo !== undefined && ARRANJOS.includes(e.arranjo as string) && !ARRANJO_TIPOS.includes(type))
+    c.err('estilo.arranjo', 'só vale em arvore, fluxo e camadas')
+}
+
+/** True when any item of the scene names a `figura` (so the caller only loads the catalog then). */
+export function usaFigura(input: unknown): boolean {
+  if (!isObj(input)) return false
+  const walk = (v: unknown): boolean =>
+    Array.isArray(v) ? v.some(walk) : isObj(v) ? v.figura !== undefined || Object.values(v).some(walk) : false
+  return walk(input.nodes) || walk(input.states) || walk(input.layers) || walk(input.actors) || walk(input.sides) || walk(input.objects)
+}
+
+export function validateScene(input: unknown, catalogo?: Catalogo | null): Validation {
   if (!isObj(input)) return { ok: false, errors: ['cena: precisa ser um objeto'] }
   const c = new Check()
+  c.catalogo = catalogo
   c.text(input, 'title', '')
   const type = input.type
   if (!isStr(type) || !(SCENE_TYPES as readonly string[]).includes(type)) {
@@ -346,6 +399,7 @@ export function validateScene(input: unknown): Validation {
     return { ok: false, errors: c.errors }
   }
   const t = type as SceneType
+  checkEstilo(c, input, t)
   checkBody(c, input, t)
   checkRelations(c, input, t)
   checkSteps(c, input, t)

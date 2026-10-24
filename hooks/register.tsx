@@ -9,7 +9,7 @@ import type { JarvisLink } from './jarvis'
 import type { Narrator } from './narration'
 import { NARRATION_KEY, chooseNarrator, narrationOn } from './narration'
 import { PickQueue } from './picks'
-import { LIMITS, SCENE_TYPES, pieceLabel, validateScene } from './scene'
+import { LIMITS, SCENE_TYPES, pieceLabel, usaFigura, validateScene } from './scene'
 import type { Scene } from './scene'
 
 export const TOOL = 'mcp__jarvis-viewer__mostrar_cena'
@@ -200,7 +200,7 @@ export const register: Register = (on, options: PluginOptions) => {
       }
     } else {
       if (input.scene === undefined) return { deny: 'Informe scene (cena nova) ou replay: true.' }
-      const checked = validateScene(input.scene)
+      const checked = validateScene(input.scene, usaFigura(input.scene) ? await carregarCatalogo($) : undefined)
       if (!checked.ok) return { deny: `Cena recusada:\n${checked.errors.join('\n')}` }
       sent = { id: `s${++counter}`, scene: checked.scene }
     }
