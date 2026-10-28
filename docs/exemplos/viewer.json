@@ -1,0 +1,23 @@
+{
+  "title": "Como o Jarvis Viewer funciona",
+  "type": "arquitetura",
+  "nodes": [
+    { "id": "you", "figura": "fluent/3d:person", "label": "Você", "sub": "pergunta no chat", "detail": "Você pede uma explicação, por texto ou pela voz do Jarvis." },
+    { "id": "claude", "figura": "fluent/3d:robot", "label": "Claude", "sub": "monta a cena", "detail": "O Claude descreve peças, ligações e passos narrados." },
+    { "id": "aux", "figura": "fluent/3d:gear", "movimento": "girar", "label": "Auxiliar", "sub": "127.0.0.1 · token", "detail": "Servidor local pequeno que guarda a cena e avisa a página." },
+    { "id": "page", "figura": "fluent/3d:television", "movimento": "respirar", "label": "Viewer", "sub": "navegador embutido · three.js", "detail": "Desenha a cena em 3D ao lado do chat." }
+  ],
+  "links": [
+    { "from": "you", "to": "claude" },
+    { "from": "claude", "to": "aux" },
+    { "from": "aux", "to": "page" },
+    { "from": "page", "to": "you" }
+  ],
+  "steps": [
+    { "focus": ["you"], "hops": [["you", "claude"]], "say": "Você pede uma explicação ao Claude, digitando ou falando com o Jarvis." },
+    { "focus": ["claude"], "say": "O Claude monta uma cena: as peças, as ligações e uma frase para cada passo." },
+    { "focus": ["aux"], "hops": [["claude", "aux"]], "say": "A cena vai para o auxiliar, um servidor que roda só na sua máquina." },
+    { "focus": ["page"], "hops": [["aux", "page"]], "say": "O viewer, ao lado do chat, desenha tudo em 3D com three.js." },
+    { "focus": ["page", "you"], "hops": [["page", "you"]], "say": "Cada passo acende as peças da vez, no ritmo da narração. Você vê o que o Claude explica." }
+  ]
+}

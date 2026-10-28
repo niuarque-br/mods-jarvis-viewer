@@ -1,5 +1,9 @@
 # 🧊 Jarvis Viewer para o Claude Code
 
+<p align="center">
+  <img src="docs/viewer.png" width="640" alt="Cena de arquitetura do Jarvis Viewer: Você, Claude, Auxiliar e Viewer, com o passo 4 aceso e a legenda embaixo">
+</p>
+
 **Veja o que o Claude explica.** Quando um conceito, uma arquitetura ou um resultado fica mais claro desenhado, o Claude monta uma cena animada em 3D, passo a passo, e a mostra ao lado do chat, narrada em voz alta ou com legenda.
 
 ![Licença MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-blue)
@@ -8,6 +12,22 @@
 ![Status](https://img.shields.io/badge/status-beta-yellow)
 
 > 🧪 **Beta.** O mod funciona de ponta a ponta, mas ainda está em teste. Ajustes e arestas são esperados.
+
+## Em funcionamento
+
+<p align="center">
+  <img src="docs/viewer.gif" width="600" alt="Cena animada do Jarvis Viewer: o pedido vai de Você ao Claude, ao Auxiliar e ao Viewer, passo a passo com legenda">
+</p>
+
+<p align="center"><sub>A cena <a href="docs/exemplos/viewer.json">docs/exemplos/viewer.json</a> com legenda (o GIF não tem som e está 1,25× mais rápido).</sub></p>
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/camadas.png" width="300" alt="Cena de camadas: interface, API, regras de negócio e banco de dados empilhados em 3D"><br><sub>Camadas</sub></td>
+    <td align="center"><img src="docs/grafico.png" width="300" alt="Cena de gráfico de barras com o resultado de janeiro a maio"><br><sub>Gráfico</sub></td>
+    <td align="center"><img src="docs/arvore.png" width="300" alt="Cena de árvore com os tipos de cena do viewer, com o ramo Livre aceso"><br><sub>Árvore</sub></td>
+  </tr>
+</table>
 
 ## Por quê
 
